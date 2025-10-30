@@ -29,8 +29,16 @@
 **テスト**:
   - `go test`（ネイティブGoテスト）
   - `testing/httptest`（契約テスト用のHTTPモックサーバー）
-  - 統合テスト用のFirestoreエミュレータ
   - Discord Webhook API、Gemini API、RSSフィードパーサーの契約テスト
+  - **注記**: Firestoreの統合テストは省略
+
+**インフラストラクチャ**: Terraform（IaC - Infrastructure as Code）
+  - GCPリソースの宣言的管理（Cloud Functions、Cloud Scheduler、Pub/Sub、Firestore、Secret Manager）
+  - バージョン管理されたインフラ設定（`terraform/`ディレクトリ）
+  - 本番環境（prod）のみの構成
+  - モジュール化による再利用性の向上（modules/配下で共通リソースを定義）
+  - 最小限の必要変数のみを使用（project_id、region）
+  - インフラ変更の再現性と監査可能性
 
 **ターゲットプラットフォーム**: Google Cloud Functions Gen 2（Linux、マネージドランタイム）
 
@@ -210,6 +218,33 @@ tests/
     ├── evaluator_test.go           # LLMスコアリングロジック（モックAPI）
     └── formatter_test.go           # Discord Embedsフォーマット
 
+terraform/
+├── environments/
+│   └── prod/
+│       ├── main.tf                 # 本番環境のリソース定義
+│       ├── variables.tf            # 入力変数（project_id、region）
+│       ├── outputs.tf              # 出力値（Cloud Functions URL、Pub/Sub topic等）
+│       ├── terraform.tfvars        # 変数の実際の値（Gitignore対象）
+│       ├── terraform.tfvars.example # 変数値の例
+│       └── backend.tf              # GCS backend設定（tfstate管理）
+└── modules/
+    ├── cloud-function/
+    │   ├── main.tf                 # Cloud Function Gen 2リソース定義
+    │   ├── variables.tf            # モジュール変数
+    │   └── outputs.tf              # モジュール出力
+    ├── scheduler/
+    │   ├── main.tf                 # Cloud Scheduler + Pub/Sub定義
+    │   ├── variables.tf
+    │   └── outputs.tf
+    ├── firestore/
+    │   ├── main.tf                 # Firestore Database + インデックス定義
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── secrets/
+        ├── main.tf                 # Secret Manager定義
+        ├── variables.tf
+        └── outputs.tf
+
 config.json                         # 設定ファイル（RSSソース、興味）
 go.mod                              # Goモジュール依存関係
 go.sum                              # 依存関係チェックサム
@@ -219,9 +254,13 @@ cloudbuild.yaml                     # GitHub Actions → Cloud Buildデプロイ
 README.md                           # プロジェクトセットアップとデプロイガイド
 ```
 
-**構造決定**: 単一のサーバーレス関数プロジェクト。すべてのコードはCloud Functionsエントリポイントの`cmd/curator/`の下にあり、ビジネスロジックは`internal/`パッケージにあります。これはサーバーレスアプリのGo規約に従い、構造をフラットに保ちます（ネストされたモジュールなし）。テストは`_test.go`サフィックスを介してコードパッケージと同じ場所に配置され、統合/契約テストは、ユニットテスト中にFirestoreエミュレータの起動オーバーヘッドを避けるために別の`tests/`ディレクトリにあります。
+**構造決定**:
+- **Goコード**: 単一のサーバーレス関数プロジェクト。すべてのコードはCloud Functionsエントリポイントの`cmd/curator/`の下にあり、ビジネスロジックは`internal/`パッケージにあります。これはサーバーレスアプリのGo規約に従い、構造をフラットに保ちます（ネストされたモジュールなし）。テストは`_test.go`サフィックスを介してコードパッケージと同じ場所に配置され、統合/契約テストは、ユニットテスト中にFirestoreエミュレータの起動オーバーヘッドを避けるために別の`tests/`ディレクトリにあります。
+- **Terraformインフラ**: 本番環境（prod）のみの構成で、`terraform/environments/prod/`配下にリソース定義を配置。`terraform/modules/`配下に各GCPリソース（cloud-function、scheduler、firestore、secrets）を独立したモジュールとして定義し、`terraform/environments/prod/main.tf`で組み合わせて使用。必須変数は`project_id`と`region`の2つのみ。`environments/`ディレクトリ構造により、将来的な開発環境の追加（`environments/dev/`）に対する拡張性を確保。
 
-**理論的根拠**: Cloud Functions Gen 2は、エントリポイント関数を持つルートに単一の`go.mod`を期待します。`internal/`ディレクトリは外部インポートを防ぎます（プライベートパッケージのGo規約）。`tests/`を分離することで、Firestoreエミュレータの起動オーバーヘッドなしに高速ユニットテストを実行できます。
+**理論的根拠**:
+- **Goコード**: Cloud Functions Gen 2は、エントリポイント関数を持つルートに単一の`go.mod`を期待します。`internal/`ディレクトリは外部インポートを防ぎます（プライベートパッケージのGo規約）。`tests/`を分離することで、Firestoreエミュレータの起動オーバーヘッドなしに高速ユニットテストを実行できます。
+- **Terraformインフラ**: `terraform/environments/`ディレクトリ構成により、将来的に開発環境が必要になった場合は`environments/dev/`を追加するだけで対応可能。現時点では`environments/prod/`のみだが、環境分離の構造を最初から確保することで、後からのリファクタリングを回避。モジュール化により各リソースの責務が明確になり、複数環境でのモジュール再利用を実現。最小限の変数設計（project_id、regionのみ）により、設定ミスのリスクを低減し、シンプルな運用を実現。tfstateはGCS backendで管理し、チーム開発時の状態共有と競合防止を実現。
 
 ## 複雑さの追跡
 
