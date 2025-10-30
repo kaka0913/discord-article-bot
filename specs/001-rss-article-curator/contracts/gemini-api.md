@@ -78,7 +78,7 @@ Content-Type: application/json
       "role": "user",
       "parts": [
         {
-          "text": "You are an expert tech content curator. Evaluate the following article for relevance to these topics: [\"Go\", \"Kubernetes\", \"Microservices\"]\n\nArticle Title: Building Microservices with Go and Kubernetes\nArticle Content: In this comprehensive guide, we explore best practices for building scalable microservices using the Go programming language and deploying them on Kubernetes clusters. We cover service mesh patterns, observability, and deployment strategies...\n\nProvide your evaluation in JSON format:\n{\n  \"relevance_score\": <0-100 integer>,\n  \"matching_topics\": [<array of matching topic names>],\n  \"summary\": \"<50-200 character summary>\",\n  \"reasoning\": \"<brief explanation>\"\n}\n\nScoring criteria:\n- 80-100: Highly relevant, covers multiple topics in depth\n- 60-79: Relevant, covers at least one topic well\n- 40-59: Partially relevant, mentions topics briefly\n- 0-39: Not relevant, unrelated content"
+          "text": "あなたは技術コンテンツキュレーションの専門家です。以下の記事を次のトピックとの関連性について評価してください: [\"Go\", \"Kubernetes\", \"Microservices\"]\n\n記事タイトル: Building Microservices with Go and Kubernetes\n記事内容: In this comprehensive guide, we explore best practices for building scalable microservices using the Go programming language and deploying them on Kubernetes clusters. We cover service mesh patterns, observability, and deployment strategies...\n\nJSON形式で評価を提供してください:\n{\n  \"relevance_score\": <0-100の整数>,\n  \"matching_topics\": [<一致するトピック名の配列>],\n  \"summary\": \"<50-200文字の要約>\",\n  \"reasoning\": \"<簡単な説明>\"\n}\n\nスコアリング基準:\n- 80-100: 非常に関連性が高い、複数のトピックを深くカバー\n- 60-79: 関連性がある、少なくとも1つのトピックを十分にカバー\n- 40-59: 部分的に関連性がある、トピックに簡潔に言及\n- 0-39: 関連性がない、無関係なコンテンツ"
         }
       ]
     }
@@ -104,7 +104,7 @@ Content-Type: application/json
       "content": {
         "parts": [
           {
-            "text": "{\"relevance_score\": 95, \"matching_topics\": [\"Go\", \"Kubernetes\", \"Microservices\"], \"summary\": \"Comprehensive guide to building scalable microservices using Go and deploying them on Kubernetes clusters with best practices.\", \"reasoning\": \"Article covers all three topics in depth with practical examples and deployment strategies.\"}"
+            "text": "{\"relevance_score\": 95, \"matching_topics\": [\"Go\", \"Kubernetes\", \"Microservices\"], \"summary\": \"Goを使用したスケーラブルなマイクロサービスの構築とKubernetesクラスターへのデプロイに関するベストプラクティスを含む包括的なガイド。\", \"reasoning\": \"記事は3つのトピックすべてを実践的な例とデプロイ戦略を含めて深くカバーしています。\"}"
           }
         ],
         "role": "model"
@@ -132,8 +132,8 @@ Content-Type: application/json
 {
   "relevance_score": 95,
   "matching_topics": ["Go", "Kubernetes", "Microservices"],
-  "summary": "Comprehensive guide to building scalable microservices using Go and deploying them on Kubernetes clusters with best practices.",
-  "reasoning": "Article covers all three topics in depth with practical examples and deployment strategies."
+  "summary": "Goを使用したスケーラブルなマイクロサービスの構築とKubernetesクラスターへのデプロイに関するベストプラクティスを含む包括的なガイド。",
+  "reasoning": "記事は3つのトピックすべてを実践的な例とデプロイ戦略を含めて深くカバーしています。"
 }
 ```
 
@@ -305,7 +305,7 @@ func TestGeminiAPIArticleEvaluation(t *testing.T) {
                     "content": map[string]interface{}{
                         "parts": []map[string]interface{}{
                             {
-                                "text": `{"relevance_score": 85, "matching_topics": ["Go", "Kubernetes"], "summary": "Comprehensive guide to building microservices...", "reasoning": "Covers topics in depth."}`,
+                                "text": `{"relevance_score": 85, "matching_topics": ["Go", "Kubernetes"], "summary": "マイクロサービス構築の包括的なガイド...", "reasoning": "トピックを深くカバーしています。"}`,
                             },
                         },
                         "role": "model",
@@ -369,29 +369,29 @@ response, err := geminiClient.EvaluateArticle(article, interests)
 ### 評価プロンプトテンプレート
 
 ```
-You are an expert tech content curator. Evaluate the following article for relevance to these topics: {TOPICS}
+あなたは技術コンテンツキュレーションの専門家です。以下の記事を次のトピックとの関連性について評価してください: {TOPICS}
 
-Article Title: {TITLE}
-Article Content: {CONTENT}
+記事タイトル: {TITLE}
+記事内容: {CONTENT}
 
-Provide your evaluation in JSON format:
+JSON形式で評価を提供してください:
 {
-  "relevance_score": <0-100 integer>,
-  "matching_topics": [<array of matching topic names from {TOPICS}>],
-  "summary": "<50-200 character summary>",
-  "reasoning": "<brief explanation of score>"
+  "relevance_score": <0-100の整数>,
+  "matching_topics": [<{TOPICS}から一致するトピック名の配列>],
+  "summary": "<50-200文字の要約>",
+  "reasoning": "<スコアの簡単な説明>"
 }
 
-Scoring criteria:
-- 80-100: Highly relevant, covers multiple topics in depth with examples
-- 60-79: Relevant, covers at least one topic well with practical content
-- 40-59: Partially relevant, mentions topics briefly without depth
-- 0-39: Not relevant, unrelated content or only tangential mentions
+スコアリング基準:
+- 80-100: 非常に関連性が高い、複数のトピックを例を含めて深くカバー
+- 60-79: 関連性がある、少なくとも1つのトピックを実践的な内容で十分にカバー
+- 40-59: 部分的に関連性がある、トピックに深みなく簡潔に言及
+- 0-39: 関連性がない、無関係なコンテンツまたは接線的な言及のみ
 
-Important:
-- Only include topics from {TOPICS} in matching_topics (no hallucinated topics)
-- Summary must be concise (50-200 chars) and highlight key takeaways
-- Be strict: generic mentions without substance should score low
+重要:
+- matching_topicsには{TOPICS}からのトピックのみを含める（幻覚トピック禁止）
+- 要約は簡潔（50-200文字）で主要なポイントを強調すること
+- 厳格に評価: 実質のない一般的な言及は低スコアとすべき
 ```
 
 **設計理由**:
