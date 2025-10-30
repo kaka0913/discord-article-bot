@@ -95,7 +95,3 @@ go test ./tests/unit/...
 - [実装計画](specs/001-rss-article-curator/plan.md)
 - [クイックスタート](specs/001-rss-article-curator/quickstart.md)
 - [データモデル](specs/001-rss-article-curator/data-model.md)
-
-## ライセンス
-
-MIT
