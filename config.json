@@ -1,0 +1,29 @@
+{
+  "rss_sources": [
+    {
+      "name": "dev.to",
+      "url": "https://dev.to/feed",
+      "enabled": true
+    },
+    {
+      "name": "Hacker News",
+      "url": "https://hnrss.org/frontpage",
+      "enabled": true
+    },
+    {
+      "name": "Zenn.dev",
+      "url": "https://zenn.dev/feed",
+      "enabled": true
+    }
+  ],
+  "interests": [
+    "Go言語",
+    "クラウドアーキテクチャ",
+    "サーバーレス",
+    "機械学習",
+    "DevOps"
+  ],
+  "article_count": 5,
+  "score_threshold": 70,
+  "schedule": "0 9 * * *"
+}

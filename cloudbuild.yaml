@@ -1,0 +1,43 @@
+# Cloud Build設定ファイル
+# GitHub Actions → Cloud Buildデプロイワークフロー用
+
+steps:
+  # ステップ1: 依存関係のインストールとビルド
+  - name: 'gcr.io/cloud-builders/go'
+    args: ['mod', 'download']
+    env:
+      - 'GO111MODULE=on'
+
+  # ステップ2: テスト実行
+  - name: 'gcr.io/cloud-builders/go'
+    args: ['test', './...', '-v']
+    env:
+      - 'GO111MODULE=on'
+
+  # ステップ3: Cloud Functionsデプロイ
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'functions'
+      - 'deploy'
+      - 'rss-curator'
+      - '--gen2'
+      - '--runtime=go121'
+      - '--region=${_REGION}'
+      - '--source=.'
+      - '--entry-point=CuratorHandler'
+      - '--trigger-topic=${_PUBSUB_TOPIC}'
+      - '--timeout=3600s'
+      - '--memory=512MB'
+      - '--max-instances=1'
+      - '--set-env-vars=GCP_PROJECT_ID=${PROJECT_ID}'
+
+# デフォルト値
+substitutions:
+  _REGION: 'asia-northeast1'
+  _PUBSUB_TOPIC: 'rss-curator-trigger'
+
+# タイムアウト設定
+timeout: '1200s'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
