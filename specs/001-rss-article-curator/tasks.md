@@ -82,7 +82,7 @@ terraform: GCPインフラをTerraformで構築
 Firestore、Secret Manager、Cloud Scheduler、Cloud Functionsの
 Terraformモジュールと本番環境設定を追加。
 
-関連: T01
+関連: T001
 ```
 
 **完了条件**:
@@ -125,7 +125,7 @@ feat: 設定管理とユーティリティパッケージを実装
 config、secrets、errors、loggingパッケージを追加。
 設定ファイルの読み込みと検証、Secret Manager統合を実装。
 
-関連: T02
+関連: T002
 ```
 
 **完了条件**:
@@ -165,7 +165,7 @@ feat: Firestore重複排除機能を実装
 通知済み・却下済み記事のFirestore追跡を実装。
 30日TTLロジックと契約テストを含む。
 
-関連: T03
+関連: T003
 ```
 
 **完了条件**:
@@ -173,7 +173,7 @@ feat: Firestore重複排除機能を実装
 - [ ] 重複チェックが正しく動作
 - [ ] TTLロジックが実装されている
 
-**依存**: T01, T002完了後
+**依存**: T001, T002完了後
 
 **参照**:
 - [contracts/firestore-schema.md](contracts/firestore-schema.md)
@@ -205,7 +205,7 @@ feat: RSS記事取得機能を実装
 RSSフィード取得・パースと記事コンテンツ抽出を実装。
 go-readabilityを使用した本文抽出を含む。
 
-関連: T04
+関連: T004
 ```
 
 **完了条件**:
@@ -244,7 +244,7 @@ feat: Gemini評価機能を実装
 記事の関連性評価、AI生成判定、要約生成を実装。
 5カテゴリスコアリング（最大100点）とレート制限を含む。
 
-関連: T05
+関連: T005
 ```
 
 **完了条件**:
@@ -284,7 +284,7 @@ feat: Discord通知機能を実装
 Discord Webhook APIクライアントとEmbedsフォーマッターを実装。
 リトライロジックと契約テストを含む。
 
-関連: T06
+関連: T006
 ```
 
 **完了条件**:
@@ -330,7 +330,7 @@ feat: メインオーケストレーションを実装
 全機能を統合したCloud Functionエントリーポイントを実装。
 RSS取得からDiscord通知までのエンドツーエンドフローを含む。
 
-関連: T07
+関連: T007
 ```
 
 **完了条件**:
@@ -339,7 +339,7 @@ RSS取得からDiscord通知までのエンドツーエンドフローを含む�
 - [ ] エラーハンドリングが適切
 - [ ] ログ出力が構造化されている
 
-**依存**: T003, T004, T05, T006完了後（すべての機能が必要）
+**依存**: T003, T004, T005, T006完了後（すべての機能が必要）
 
 **参照**:
 - [spec.md](spec.md)（フロー全体）
@@ -372,7 +372,7 @@ test: ローカルテストとバグ修正
 
 ローカル環境での動作確認とバグ修正を実施。
 
-関連: T08
+関連: T008
 ```
 
 **完了条件**:
@@ -412,7 +412,7 @@ deploy: GCPデプロイとCI/CD設定
 Cloud FunctionとTerraformインフラをGCPにデプロイ。
 Cloud BuildによるCI/CDパイプラインを設定。
 
-関連: T09
+関連: T009
 ```
 
 **完了条件**:
@@ -451,7 +451,7 @@ CONFIG_URL=https://raw.githubusercontent.com/your-repo/main/config.json
 ```
 T001: Terraform開発
   ↓ gcloud auth login（GCP認証）
-T02-T007: ローカル開発
+T002-T007: ローカル開発
   ↓ .envファイルに開発用APIキー設定
 T008: ローカルテスト
   ↓ Gemini API Key、Discord Webhook URL取得
@@ -474,4 +474,4 @@ T009: GCPデプロイ
 - [ ] T008: ローカルテストとデバッグ
 - [ ] T009: GCPデプロイとCI/CD
 
-**MVP完成**: T09完了時点
+**MVP完成**: T009完了時点
