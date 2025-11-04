@@ -37,7 +37,8 @@ func (l *loader) Load(ctx context.Context, source string) (*Config, error) {
 	var err error
 
 	// GitHub URLの場合はraw.githubusercontent.comに変換
-	if strings.Contains(source, "github.com") && !strings.Contains(source, "raw.githubusercontent.com") {
+	// より厳密な判定: github.com/ と /blob/ の両方が含まれる場合のみ変換
+	if strings.Contains(source, "github.com/") && strings.Contains(source, "/blob/") {
 		source = convertToRawGitHubURL(source)
 	}
 

@@ -6,6 +6,16 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// バリデーション用の定数
+const (
+	MinTitleLength   = 5
+	MaxTitleLength   = 500
+	MinContentLength = 100
+	MaxContentLength = 50000
+	MinSummaryLength = 50
+	MaxSummaryLength = 200
+)
+
 // Validator は設定を検証するためのインターフェース
 type Validator interface {
 	Validate(config *Config) error
@@ -68,17 +78,17 @@ func ValidateArticle(article *Article) error {
 		return fmt.Errorf("記事の検証に失敗しました: %w", err)
 	}
 
-	// タイトルの長さチェック（5〜500文字）
+	// タイトルの長さチェック
 	titleLen := len([]rune(article.Title))
-	if titleLen < 5 || titleLen > 500 {
-		return fmt.Errorf("記事タイトルは5〜500文字である必要があります (現在: %d文字)", titleLen)
+	if titleLen < MinTitleLength || titleLen > MaxTitleLength {
+		return fmt.Errorf("記事タイトルは%d〜%d文字である必要があります (現在: %d文字)", MinTitleLength, MaxTitleLength, titleLen)
 	}
 
-	// コンテンツテキストの長さチェック（100〜50,000文字）
+	// コンテンツテキストの長さチェック
 	if article.ContentText != "" {
 		contentLen := len([]rune(article.ContentText))
-		if contentLen < 100 || contentLen > 50000 {
-			return fmt.Errorf("記事コンテンツは100〜50,000文字である必要があります (現在: %d文字)", contentLen)
+		if contentLen < MinContentLength || contentLen > MaxContentLength {
+			return fmt.Errorf("記事コンテンツは%d〜%d文字である必要があります (現在: %d文字)", MinContentLength, MaxContentLength, contentLen)
 		}
 	}
 
@@ -92,10 +102,10 @@ func ValidateArticleEvaluation(eval *ArticleEvaluation) error {
 		return fmt.Errorf("記事評価の検証に失敗しました: %w", err)
 	}
 
-	// 要約の長さチェック（50〜200文字）
+	// 要約の長さチェック
 	summaryLen := len([]rune(eval.Summary))
-	if summaryLen < 50 || summaryLen > 200 {
-		return fmt.Errorf("要約は50〜200文字である必要があります (現在: %d文字)", summaryLen)
+	if summaryLen < MinSummaryLength || summaryLen > MaxSummaryLength {
+		return fmt.Errorf("要約は%d〜%d文字である必要があります (現在: %d文字)", MinSummaryLength, MaxSummaryLength, summaryLen)
 	}
 
 	// 関連性がある場合はマッチングトピックが必要

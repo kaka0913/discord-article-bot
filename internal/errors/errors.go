@@ -65,6 +65,38 @@ func Wrap(errType ErrorType, message string, err error) *AppError {
 	}
 }
 
+// Sentinel errors - errors.Is()での比較用
+var (
+	// 設定関連
+	ErrConfigNotFound    = New(ErrorTypeConfig, "設定ファイルが見つかりません")
+	ErrInvalidConfig     = New(ErrorTypeConfig, "無効な設定です")
+	ErrConfigLoadFailed  = New(ErrorTypeConfig, "設定の読み込みに失敗しました")
+
+	// バリデーション関連
+	ErrValidationFailed  = New(ErrorTypeValidation, "バリデーションに失敗しました")
+	ErrInvalidURL        = New(ErrorTypeValidation, "無効なURLです")
+
+	// ネットワーク関連
+	ErrNetworkTimeout    = New(ErrorTypeNetwork, "ネットワークタイムアウトが発生しました")
+	ErrConnectionFailed  = New(ErrorTypeNetwork, "接続に失敗しました")
+
+	// ストレージ関連
+	ErrStorageNotFound   = New(ErrorTypeStorage, "データが見つかりません")
+	ErrStorageWriteFailed = New(ErrorTypeStorage, "データの書き込みに失敗しました")
+
+	// LLM関連
+	ErrLLMAPIFailed      = New(ErrorTypeLLM, "LLM APIの呼び出しに失敗しました")
+	ErrLLMQuotaExceeded  = New(ErrorTypeLLM, "LLMのクォータを超過しました")
+
+	// RSS関連
+	ErrRSSFetchFailed    = New(ErrorTypeRSS, "RSSフィードの取得に失敗しました")
+	ErrRSSParseFailed    = New(ErrorTypeRSS, "RSSフィードのパースに失敗しました")
+
+	// Discord関連
+	ErrDiscordAPIFailed  = New(ErrorTypeDiscord, "Discord APIの呼び出しに失敗しました")
+	ErrDiscordSendFailed = New(ErrorTypeDiscord, "メッセージの送信に失敗しました")
+)
+
 // NewConfigError は設定関連のエラーを作成します
 func NewConfigError(message string, err error) *AppError {
 	return Wrap(ErrorTypeConfig, message, err)

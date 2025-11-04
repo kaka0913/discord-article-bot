@@ -1,9 +1,15 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
+
+// makeTestContent はテスト用の文字列を生成します
+func makeTestContent(length int) string {
+	return strings.Repeat("x", length)
+}
 
 func TestValidator_Validate(t *testing.T) {
 	validator := NewValidator()
@@ -116,7 +122,7 @@ func TestValidateArticle(t *testing.T) {
 				Title:       "Building Microservices with Go",
 				URL:         "https://dev.to/example/post",
 				SourceFeed:  "Dev.to",
-				ContentText: "In this article, we explore how to build scalable microservices using Go and Kubernetes. " + string(make([]byte, 50)),
+				ContentText: "In this article, we explore how to build scalable microservices using Go and Kubernetes. " + makeTestContent(50),
 				FetchedAt:   time.Now(),
 			},
 			wantErr: false,
@@ -127,7 +133,7 @@ func TestValidateArticle(t *testing.T) {
 				Title:       "Go",
 				URL:         "https://dev.to/example/post",
 				SourceFeed:  "Dev.to",
-				ContentText: string(make([]byte, 200)),
+				ContentText: makeTestContent(200),
 				FetchedAt:   time.Now(),
 			},
 			wantErr: true,

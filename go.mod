@@ -1,4 +1,4 @@
-module github.com/yourusername/rss-article-curator
+module github.com/kaka0913/discord-article-bot
 
 go 1.23
 

@@ -58,7 +58,7 @@ func (c *Config) GetEnabledSources() []RSSSource {
 
 // Article はRSSフィードから取得した記事を表します
 type Article struct {
-	Title         string    `json:"title"`
+	Title         string    `json:"title" validate:"required,min=5,max=500"`
 	URL           string    `json:"url" validate:"required,url"`
 	PublishedDate time.Time `json:"published_date,omitempty"`
 	SourceFeed    string    `json:"source_feed"`
