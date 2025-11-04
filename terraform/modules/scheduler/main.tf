@@ -26,7 +26,7 @@ resource "google_cloud_scheduler_job" "daily_curator" {
   }
 
   retry_config {
-    retry_count = 3
+    retry_count          = 3
     min_backoff_duration = "5s"
     max_backoff_duration = "60s"
   }

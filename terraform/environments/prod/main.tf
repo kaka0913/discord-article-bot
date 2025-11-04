@@ -74,13 +74,13 @@ module "firestore" {
 module "cloud_function" {
   source = "../../modules/cloud-function"
 
-  project_id               = var.project_id
-  region                   = var.region
-  config_url               = var.config_url
-  pubsub_topic_id          = module.scheduler.pubsub_topic_id
-  source_archive_object    = var.source_archive_object
-  gemini_api_key_secret    = "gemini-api-key"
-  discord_webhook_secret   = "discord-webhook-url"
+  project_id             = var.project_id
+  region                 = var.region
+  config_url             = var.config_url
+  pubsub_topic_id        = module.scheduler.pubsub_topic_id
+  source_archive_object  = var.source_archive_object
+  gemini_api_key_secret  = "gemini-api-key"
+  discord_webhook_secret = "discord-webhook-url"
 
   depends_on = [
     google_project_service.cloudfunctions,
@@ -93,8 +93,8 @@ module "cloud_function" {
 module "secrets" {
   source = "../../modules/secrets"
 
-  project_id                      = var.project_id
-  cloud_function_service_account  = module.cloud_function.service_account_email
+  project_id                     = var.project_id
+  cloud_function_service_account = module.cloud_function.service_account_email
 
   depends_on = [google_project_service.secretmanager]
 }

@@ -56,9 +56,9 @@ resource "google_cloudfunctions2_function" "curator" {
     service_account_email = google_service_account.curator_function.email
 
     environment_variables = {
-      CONFIG_URL           = var.config_url
-      GCP_PROJECT_ID       = var.project_id
-      GEMINI_API_KEY_SECRET = var.gemini_api_key_secret
+      CONFIG_URL             = var.config_url
+      GCP_PROJECT_ID         = var.project_id
+      GEMINI_API_KEY_SECRET  = var.gemini_api_key_secret
       DISCORD_WEBHOOK_SECRET = var.discord_webhook_secret
     }
   }
