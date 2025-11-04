@@ -18,15 +18,18 @@ resource "google_project_iam_member" "firestore_user" {
 
 # Cloud Functions用のストレージバケット（ソースコードアーカイブ保存用）
 resource "google_storage_bucket" "function_source" {
-  project       = var.project_id
-  name          = "${var.project_id}-curator-function-source"
-  location      = var.region
-  force_destroy = true
+  project  = var.project_id
+  name     = "${var.project_id}-curator-function-source"
+  location = var.region
+  # 本番環境では誤削除防止のためfalseを推奨
+  force_destroy = false
 
   uniform_bucket_level_access = true
 
   labels = {
-    app = "rss-article-curator"
+    app         = "rss-article-curator"
+    environment = "prod"
+    managed_by  = "terraform"
   }
 }
 
@@ -71,6 +74,8 @@ resource "google_cloudfunctions2_function" "curator" {
   }
 
   labels = {
-    app = "rss-article-curator"
+    app         = "rss-article-curator"
+    environment = "prod"
+    managed_by  = "terraform"
   }
 }

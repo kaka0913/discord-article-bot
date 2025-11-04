@@ -8,7 +8,8 @@ resource "google_firestore_database" "database" {
   type        = "FIRESTORE_NATIVE"
 
   # 削除保護を有効化（本番環境での誤削除を防止）
-  deletion_policy = "DELETE"
+  # ABANDON: terraform destroyでもFirestoreは削除されず、GCPコンソールから手動削除が必要
+  deletion_policy = "ABANDON"
 }
 
 # notified_articles コレクション用のインデックス

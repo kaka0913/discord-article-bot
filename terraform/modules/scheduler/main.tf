@@ -7,7 +7,9 @@ resource "google_pubsub_topic" "curator_trigger" {
   name    = "rss-curator-trigger"
 
   labels = {
-    app = "rss-article-curator"
+    app         = "rss-article-curator"
+    environment = "prod"
+    managed_by  = "terraform"
   }
 }
 

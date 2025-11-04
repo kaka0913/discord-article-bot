@@ -11,7 +11,9 @@ resource "google_secret_manager_secret" "gemini_api_key" {
   }
 
   labels = {
-    app = "rss-article-curator"
+    app         = "rss-article-curator"
+    environment = "prod"
+    managed_by  = "terraform"
   }
 }
 
@@ -25,7 +27,9 @@ resource "google_secret_manager_secret" "discord_webhook_url" {
   }
 
   labels = {
-    app = "rss-article-curator"
+    app         = "rss-article-curator"
+    environment = "prod"
+    managed_by  = "terraform"
   }
 }
 
