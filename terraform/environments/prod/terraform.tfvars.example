@@ -1,0 +1,15 @@
+# Terraform変数の例
+# このファイルをterraform.tfvarsにコピーして、実際の値を設定してください
+
+# GCPプロジェクトID（必須）
+project_id = "your-gcp-project-id"
+
+# デプロイリージョン（デフォルト: asia-northeast1）
+region = "asia-northeast1"
+
+# config.jsonファイルのURL（GitHub raw URLなど）
+# 例: "https://raw.githubusercontent.com/your-username/your-repo/main/config.json"
+config_url = "https://raw.githubusercontent.com/USERNAME/REPO/main/config.json"
+
+# ソースコードアーカイブのオブジェクト名（デフォルト: source.zip）
+source_archive_object = "source.zip"
