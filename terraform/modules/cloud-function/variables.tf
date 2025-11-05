@@ -23,13 +23,3 @@ variable "source_archive_object" {
   type        = string
   default     = "source.zip"
 }
-
-variable "gemini_api_key_secret" {
-  description = "Gemini API KeyのSecret Manager ID"
-  type        = string
-}
-
-variable "discord_webhook_secret" {
-  description = "Discord Webhook URLのSecret Manager ID"
-  type        = string
-}

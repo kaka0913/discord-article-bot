@@ -61,8 +61,8 @@ resource "google_cloudfunctions2_function" "curator" {
     environment_variables = {
       CONFIG_URL             = var.config_url
       GCP_PROJECT_ID         = var.project_id
-      GEMINI_API_KEY_SECRET  = var.gemini_api_key_secret
-      DISCORD_WEBHOOK_SECRET = var.discord_webhook_secret
+      GEMINI_API_KEY_SECRET  = "gemini-api-key"
+      DISCORD_WEBHOOK_SECRET = "discord-webhook-url"
     }
   }
 
