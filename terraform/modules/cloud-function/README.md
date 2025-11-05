@@ -69,7 +69,9 @@ module "cloud_function" {
 
 ## デプロイ
 
-ソースコードをデプロイするには、事前にCloud Storageバケットにzipファイルをアップロードします：
+### 方法1: 手動デプロイ（開発・検証用）
+
+ソースコードを手動でCloud Storageにアップロードする方法：
 
 ```bash
 # ソースコードをzipに圧縮
@@ -77,4 +79,29 @@ zip -r source.zip . -x "*.git*" -x "terraform/*"
 
 # Cloud Storageにアップロード
 gsutil cp source.zip gs://${PROJECT_ID}-curator-function-source/source.zip
+
+# Terraform経由でCloud Functionsを更新（必要に応じて）
+cd terraform/environments/prod
+terraform apply
 ```
+
+### 方法2: Cloud Build CI/CD（本番推奨）
+
+Cloud Buildを使った自動デプロイでは、上記の手動アップロードは不要です：
+
+1. **cloudbuild.yaml**を作成してビルド・デプロイを自動化
+2. GitHubへのpush時に自動トリガー
+3. Cloud Buildが自動的にソースコードをビルドし、Cloud Functionsにデプロイ
+
+**メリット**:
+- 手動アップロード不要
+- ビルドとテストの自動化
+- デプロイ履歴の追跡
+- ロールバックが容易
+
+**設定例は将来のタスク（T009: GCPデプロイとCI/CD）で実装予定**
+
+### 注意事項
+
+- 初回の`terraform apply`時は、ソースコードがまだアップロードされていないためエラーになる可能性があります
+- その場合は、方法1で一度手動デプロイしてから、CI/CDパイプラインを構築することを推奨します
