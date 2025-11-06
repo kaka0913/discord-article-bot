@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Tech Blog Atom Feed</title>
+  <link href="https://example.com/atom"/>
+  <updated>2023-11-29T14:15:00Z</updated>
+  <entry>
+    <title>Understanding Docker Containers</title>
+    <link href="https://example.com/articles/understanding-docker-containers"/>
+    <id>https://example.com/articles/understanding-docker-containers</id>
+    <updated>2023-11-27T08:00:00Z</updated>
+    <summary>A deep dive into Docker container technology.</summary>
+  </entry>
+  <entry>
+    <title>Cloud Native Development</title>
+    <link href="https://example.com/articles/cloud-native-development"/>
+    <id>https://example.com/articles/cloud-native-development</id>
+    <updated>2023-11-28T11:00:00Z</updated>
+    <summary>Building applications for cloud-native environments.</summary>
+  </entry>
+</feed>
