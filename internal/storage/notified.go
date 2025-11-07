@@ -3,13 +3,14 @@ package storage
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/kaka0913/discord-article-bot/internal/config"
+	"github.com/kaka0913/discord-article-bot/internal/logging"
 )
 
 const (
@@ -22,16 +23,16 @@ const (
 
 // SaveNotifiedArticle は通知済み記事をFirestoreに保存します
 func (c *Client) SaveNotifiedArticle(ctx context.Context, articleURL, discordMessageID, articleTitle string, relevanceScore int) error {
-	// URLをFirestoreドキュメントIDに変換（/ を - に置換）
+	// URLをFirestoreドキュメントIDに変換（SHA256ハッシュ）
 	docID := urlToDocID(articleURL)
 
 	docRef := c.client.Collection(NotifiedArticlesCollection).Doc(docID)
 
-	notifiedArticle := config.NotifiedArticle{
-		NotifiedAt:       time.Now(),
-		DiscordMessageID: discordMessageID,
-		ArticleTitle:     articleTitle,
-		RelevanceScore:   relevanceScore,
+	notifiedArticle := map[string]interface{}{
+		"notified_at":        firestore.ServerTimestamp,
+		"discord_message_id": discordMessageID,
+		"article_title":      articleTitle,
+		"relevance_score":    relevanceScore,
 	}
 
 	_, err := docRef.Set(ctx, notifiedArticle)
@@ -62,6 +63,9 @@ func (c *Client) IsArticleNotified(ctx context.Context, articleURL string) (bool
 	if doc.Exists() {
 		var notifiedArticle config.NotifiedArticle
 		if err := doc.DataTo(&notifiedArticle); err != nil {
+			// データのパースに失敗した場合、破損データの可能性があるのでログを出力
+			logger := logging.FromContext(ctx)
+			logger.Warn("Failed to parse notified article data", "url", articleURL, "error", err)
 			return false, fmt.Errorf("failed to parse notified article: %w", err)
 		}
 
@@ -75,13 +79,4 @@ func (c *Client) IsArticleNotified(ctx context.Context, articleURL string) (bool
 	}
 
 	return false, nil
-}
-
-// urlToDocID はURLをFirestoreドキュメントIDに変換します
-// Firestoreのドキュメント文字列制限に対応するため、/を--に置換
-func urlToDocID(url string) string {
-	// : を - に、/ を -- に置換
-	docID := strings.ReplaceAll(url, "://", "-")
-	docID = strings.ReplaceAll(docID, "/", "--")
-	return docID
 }

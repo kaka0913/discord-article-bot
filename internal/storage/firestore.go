@@ -3,6 +3,8 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"cloud.google.com/go/firestore"
@@ -36,4 +38,14 @@ func (c *Client) Close() error {
 // GetClient は内部のFirestoreクライアントを返します（テスト用）
 func (c *Client) GetClient() *firestore.Client {
 	return c.client
+}
+
+// urlToDocID はURLをFirestoreドキュメントIDに変換します
+// SHA256ハッシュを使用することで、以下の問題を解決します：
+// - クエリパラメータ（?、&、=）や特殊文字への対応
+// - Firestoreのドキュメント文字列制限（1,500バイト）への対応
+// - URLエンコード文字への対応
+func urlToDocID(url string) string {
+	hash := sha256.Sum256([]byte(url))
+	return hex.EncodeToString(hash[:])
 }

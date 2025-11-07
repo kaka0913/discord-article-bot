@@ -2,6 +2,8 @@ package contract
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"testing"
 	"time"
@@ -9,6 +11,13 @@ import (
 	"github.com/kaka0913/discord-article-bot/internal/config"
 	"github.com/kaka0913/discord-article-bot/internal/storage"
 )
+
+// urlToDocID はテスト用にURLをFirestoreドキュメントIDに変換します
+// storage.urlToDocIDと同じロジックを使用
+func urlToDocID(url string) string {
+	hash := sha256.Sum256([]byte(url))
+	return hex.EncodeToString(hash[:])
+}
 
 // TestMain はテストスイートの前後でセットアップとクリーンアップを実行します
 func TestMain(m *testing.M) {
@@ -134,7 +143,7 @@ func TestNotifiedArticleTTL(t *testing.T) {
 	articleURL := "https://dev.to/example/old-article"
 
 	// 31日前の古い記事を手動で保存（TTL期限切れ）
-	docID := "https---dev.to--example--old-article"
+	docID := urlToDocID(articleURL)
 	oldArticle := config.NotifiedArticle{
 		NotifiedAt:       time.Now().AddDate(0, 0, -31), // 31日前
 		DiscordMessageID: "1234567890123456789",
@@ -235,7 +244,7 @@ func TestRejectedArticleTTL(t *testing.T) {
 	articleURL := "https://dev.to/example/old-rejected-article"
 
 	// 31日前の古い却下記事を手動で保存（TTL期限切れ）
-	docID := "https---dev.to--example--old-rejected-article"
+	docID := urlToDocID(articleURL)
 	oldArticle := config.RejectedArticle{
 		EvaluatedAt:    time.Now().AddDate(0, 0, -31), // 31日前
 		Reason:         config.ReasonLowRelevance,

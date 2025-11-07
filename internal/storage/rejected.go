@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/kaka0913/discord-article-bot/internal/config"
+	"github.com/kaka0913/discord-article-bot/internal/logging"
 )
 
 const (
@@ -21,15 +23,20 @@ const (
 
 // SaveRejectedArticle は却下された記事をFirestoreに保存します
 func (c *Client) SaveRejectedArticle(ctx context.Context, articleURL, reason string, relevanceScore *int) error {
-	// URLをFirestoreドキュメントIDに変換
+	// URLをFirestoreドキュメントIDに変換（SHA256ハッシュ）
 	docID := urlToDocID(articleURL)
 
 	docRef := c.client.Collection(RejectedArticlesCollection).Doc(docID)
 
-	rejectedArticle := config.RejectedArticle{
-		EvaluatedAt:    time.Now(),
-		Reason:         reason,
-		RelevanceScore: relevanceScore,
+	rejectedArticle := map[string]interface{}{
+		"evaluated_at": firestore.ServerTimestamp,
+		"reason":       reason,
+	}
+
+	if relevanceScore != nil {
+		rejectedArticle["relevance_score"] = *relevanceScore
+	} else {
+		rejectedArticle["relevance_score"] = nil
 	}
 
 	_, err := docRef.Set(ctx, rejectedArticle)
@@ -60,6 +67,9 @@ func (c *Client) IsArticleRejected(ctx context.Context, articleURL string) (bool
 	if doc.Exists() {
 		var rejectedArticle config.RejectedArticle
 		if err := doc.DataTo(&rejectedArticle); err != nil {
+			// データのパースに失敗した場合、破損データの可能性があるのでログを出力
+			logger := logging.FromContext(ctx)
+			logger.Warn("Failed to parse rejected article data", "url", articleURL, "error", err)
 			return false, fmt.Errorf("failed to parse rejected article: %w", err)
 		}
 
