@@ -77,7 +77,7 @@ func formatArticleEmbed(article Article) EmbedObject {
 
 // truncateString は文字列を指定された長さに切り詰める（末尾に"..."を付ける）
 func truncateString(s string, maxLen int) string {
-	// UTF-8のルーン数でカウント
+	// 文字数（Unicodeコードポイント数）でカウント
 	runes := []rune(s)
 	if len(runes) <= maxLen {
 		return s

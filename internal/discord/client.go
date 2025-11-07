@@ -80,9 +80,10 @@ type WebhookResponse struct {
 
 // ErrorResponse はDiscord APIのエラーレスポンス
 type ErrorResponse struct {
-	Message string          `json:"message"`
-	Code    int             `json:"code"`
-	Errors  json.RawMessage `json:"errors,omitempty"`
+	Message    string          `json:"message"`
+	Code       int             `json:"code"`
+	Errors     json.RawMessage `json:"errors,omitempty"`
+	RetryAfter float64         `json:"retry_after,omitempty"`
 }
 
 // PostArticles は記事リストをDiscordに投稿
@@ -107,7 +108,7 @@ func (c *Client) postWithRetry(ctx context.Context, payload WebhookPayload, maxR
 		if attempt > 0 {
 			// 指数バックオフ: 5s, 10s, 20s
 			backoff := time.Duration(5*(1<<uint(attempt-1))) * time.Second
-			c.logger.Info(fmt.Sprintf("Retrying Discord webhook after %v (attempt %d/%d)", backoff, attempt, maxRetries))
+			c.logger.Info(fmt.Sprintf("Discord webhookを%v後に再試行します (試行 %d/%d)", backoff, attempt, maxRetries))
 
 			select {
 			case <-time.After(backoff):
@@ -127,19 +128,21 @@ func (c *Client) postWithRetry(ctx context.Context, payload WebhookPayload, maxR
 		if isRateLimitError(err) {
 			// レート制限エラーの場合、retry_after秒待つ
 			if retryAfter := extractRetryAfter(err); retryAfter > 0 {
-				c.logger.Warn(fmt.Sprintf("Rate limited, waiting %v seconds", retryAfter))
+				c.logger.Warn(fmt.Sprintf("レート制限に達しました。%v秒待機します", retryAfter))
 				select {
 				case <-time.After(time.Duration(retryAfter) * time.Second):
 				case <-ctx.Done():
 					return "", ctx.Err()
 				}
+				// レート制限待機はリトライカウントに含めない
+				attempt--
 				continue
 			}
 		}
 
 		// 致命的なエラー（404など）の場合はリトライしない
 		if isFatalError(err) {
-			c.logger.Error("Fatal error, not retrying", "error", err)
+			c.logger.Error("致命的なエラーが発生しました。リトライしません", "error", err)
 			return "", err
 		}
 	}
@@ -186,7 +189,7 @@ func (c *Client) post(ctx context.Context, payload WebhookPayload) (string, erro
 		return "", fmt.Errorf("failed to parse success response: %w", err)
 	}
 
-	c.logger.Info(fmt.Sprintf("Successfully posted message to Discord: %s", webhookResp.ID))
+	c.logger.Info(fmt.Sprintf("Discordへのメッセージ送信に成功しました: %s", webhookResp.ID))
 	return webhookResp.ID, nil
 }
 
@@ -194,7 +197,11 @@ func (c *Client) post(ctx context.Context, payload WebhookPayload) (string, erro
 func (c *Client) handleErrorResponse(statusCode int, body []byte) error {
 	var errResp ErrorResponse
 	if err := json.Unmarshal(body, &errResp); err != nil {
-		return fmt.Errorf("HTTP %d: failed to parse error response: %s", statusCode, string(body))
+		// パース失敗時も DiscordAPIError を返す（型安全性のため）
+		return &DiscordAPIError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("failed to parse error response: %s", string(body)),
+		}
 	}
 
 	return &DiscordAPIError{
@@ -202,6 +209,7 @@ func (c *Client) handleErrorResponse(statusCode int, body []byte) error {
 		Code:       errResp.Code,
 		Message:    errResp.Message,
 		Errors:     errResp.Errors,
+		RetryAfter: errResp.RetryAfter,
 	}
 }
 
@@ -211,6 +219,7 @@ type DiscordAPIError struct {
 	Code       int
 	Message    string
 	Errors     json.RawMessage
+	RetryAfter float64
 }
 
 func (e *DiscordAPIError) Error() string {
@@ -248,12 +257,7 @@ func isFatalError(err error) bool {
 // extractRetryAfter はエラーからretry_after値を抽出
 func extractRetryAfter(err error) float64 {
 	if apiErr, ok := err.(*DiscordAPIError); ok {
-		var rateLimitResp struct {
-			RetryAfter float64 `json:"retry_after"`
-		}
-		if err := json.Unmarshal(apiErr.Errors, &rateLimitResp); err == nil {
-			return rateLimitResp.RetryAfter
-		}
+		return apiErr.RetryAfter
 	}
 	return 0
 }

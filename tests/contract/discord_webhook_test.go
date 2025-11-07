@@ -115,7 +115,9 @@ func TestDiscordWebhookValidPayload(t *testing.T) {
 func TestDiscordWebhookMaxEmbeds(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload discord.WebhookPayload
-		json.NewDecoder(r.Body).Decode(&payload)
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("Failed to decode request body: %v", err)
+		}
 
 		if len(payload.Embeds) != 10 {
 			t.Errorf("Expected 10 embeds, got: %d", len(payload.Embeds))
@@ -155,7 +157,9 @@ func TestDiscordWebhookMaxEmbeds(t *testing.T) {
 func TestDiscordWebhookTitleTooLong(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload discord.WebhookPayload
-		json.NewDecoder(r.Body).Decode(&payload)
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("Failed to decode request body: %v", err)
+		}
 
 		// タイトルが切り詰められていることを確認
 		if len(payload.Embeds) > 0 {
@@ -204,7 +208,9 @@ func TestDiscordWebhookTitleTooLong(t *testing.T) {
 func TestDiscordWebhookDescriptionTooLong(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload discord.WebhookPayload
-		json.NewDecoder(r.Body).Decode(&payload)
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("Failed to decode request body: %v", err)
+		}
 
 		// 説明が切り詰められていることを確認
 		if len(payload.Embeds) > 0 {
