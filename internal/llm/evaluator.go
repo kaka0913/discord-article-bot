@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/kaka0913/discord-article-bot/internal/config"
@@ -16,6 +15,7 @@ type EvaluationResult struct {
 	MatchingTopics []string `json:"matching_topics"`
 	Summary        string   `json:"summary"`
 	Reasoning      string   `json:"reasoning"`
+	IsAIGenerated  bool     `json:"is_ai_generated"`
 }
 
 // Evaluator は記事の関連性評価を行います
@@ -56,7 +56,7 @@ func (e *Evaluator) EvaluateArticle(
 	}
 
 	// 検証
-	if err := validateEvaluationResult(&result); err != nil {
+	if err := ValidateEvaluationResult(&result); err != nil {
 		return nil, fmt.Errorf("invalid evaluation result: %w", err)
 	}
 
@@ -75,7 +75,11 @@ func (e *Evaluator) EvaluateArticle(
 
 // buildEvaluationPrompt は評価用のプロンプトを構築します
 func buildEvaluationPrompt(article *config.Article, topics []string) string {
-	topicsJSON, _ := json.Marshal(topics)
+	topicsJSON, err := json.Marshal(topics)
+	if err != nil {
+		// topics []stringのマーシャルは基本的に失敗しないが、念のため空配列として扱う
+		topicsJSON = []byte("[]")
+	}
 
 	return fmt.Sprintf(`あなたは技術コンテンツキュレーションの専門家です。以下の記事を次のトピックとの関連性について評価してください: %s
 
@@ -87,7 +91,8 @@ JSON形式で評価を提供してください:
   "relevance_score": <0-100の整数>,
   "matching_topics": [<一致するトピック名の配列>],
   "summary": "<50-200文字の要約>",
-  "reasoning": "<スコアの簡単な説明>"
+  "reasoning": "<スコアの簡単な説明>",
+  "is_ai_generated": <true/false>
 }
 
 スコアリング基準（加算方式、最大100点）:
@@ -145,53 +150,29 @@ JSON形式で評価を提供してください:
 - 同じトピックへの複数の表面的言及より、1つのトピックへの深い言及を高く評価`,
 		string(topicsJSON),
 		article.Title,
-		truncateContent(article.ContentText, 10000), // コンテンツを適切な長さに制限
+		TruncateContent(article.ContentText, MaxPromptContentLength),
 		string(topicsJSON),
 	)
 }
 
-// truncateContent はコンテンツを指定した最大文字数に切り詰めます
-func truncateContent(content string, maxLen int) string {
-	if len(content) <= maxLen {
-		return content
-	}
-	return content[:maxLen] + "..."
-}
-
-// validateEvaluationResult は評価結果を検証します
-func validateEvaluationResult(result *EvaluationResult) error {
-	// スコアの範囲チェック
-	if result.RelevanceScore < 0 || result.RelevanceScore > 100 {
-		return fmt.Errorf("relevance_score must be between 0 and 100, got %d", result.RelevanceScore)
-	}
-
-	// 要約の長さチェック
-	summaryLen := len([]rune(result.Summary))
-	if summaryLen < 50 || summaryLen > 200 {
-		return fmt.Errorf("summary must be between 50 and 200 characters, got %d", summaryLen)
-	}
-
-	// スコアが0より大きい場合、一致するトピックが必要
-	if result.RelevanceScore > 0 && len(result.MatchingTopics) == 0 {
-		return fmt.Errorf("matching_topics must not be empty when relevance_score > 0")
-	}
-
-	return nil
-}
-
 // DetermineRejectionReason は評価結果から却下理由を判定します
-func DetermineRejectionReason(evaluation *config.ArticleEvaluation) string {
-	// AI生成判定または非常に低いスコア
-	if evaluation.RelevanceScore == 0 {
-		// reasoningにAI生成の言及があるかチェック
-		if strings.Contains(evaluation.Summary, "AI生成") {
-			return config.ReasonLowRelevance
+func DetermineRejectionReason(result *EvaluationResult) string {
+	// AI生成記事と判定された場合
+	if result.IsAIGenerated {
+		return config.ReasonLowRelevance
+	}
+
+	// スコアが0の場合
+	if result.RelevanceScore == 0 {
+		// トピックマッチがない場合
+		if len(result.MatchingTopics) == 0 {
+			return config.ReasonNoTopicMatch
 		}
-		return config.ReasonNoTopicMatch
+		return config.ReasonLowRelevance
 	}
 
 	// トピックマッチなし
-	if len(evaluation.MatchingTopics) == 0 {
+	if len(result.MatchingTopics) == 0 {
 		return config.ReasonNoTopicMatch
 	}
 

@@ -23,11 +23,11 @@ const (
 	// MaxOutputTokens は応答の最大トークン数
 	MaxOutputTokens = 500
 
-	// RequestsPerMinute はGemini APIの無料枠のレート制限（15 RPM）
-	RequestsPerMinute = 15
-
-	// RequestInterval は1リクエストあたりの平均間隔（4秒）
+	// RequestInterval は1リクエストあたりの平均間隔（4秒 = 15 RPM）
 	RequestInterval = 4 * time.Second
+
+	// BurstLimit はレート制限のバースト許容数（短期的なスパイクに対応）
+	BurstLimit = 3
 )
 
 // Client はGemini APIクライアントを表します
@@ -39,8 +39,8 @@ type Client struct {
 
 // NewClient は新しいGemini APIクライアントを作成します
 func NewClient(apiKey string) *Client {
-	// 15 RPM = 4秒に1リクエスト、バースト1を許可
-	limiter := rate.NewLimiter(rate.Every(RequestInterval), 1)
+	// 15 RPM = 4秒に1リクエスト、バースト3を許可（短期的なスパイクに対応）
+	limiter := rate.NewLimiter(rate.Every(RequestInterval), BurstLimit)
 
 	return &Client{
 		apiKey:     apiKey,
@@ -184,7 +184,17 @@ func (c *Client) GenerateContent(ctx context.Context, prompt string) (*GeminiRes
 		return nil, fmt.Errorf("no candidates in response")
 	}
 
-	if geminiResp.Candidates[0].FinishReason != "STOP" {
+	// FinishReasonに応じた適切なハンドリング
+	switch geminiResp.Candidates[0].FinishReason {
+	case "STOP":
+		// 正常完了
+	case "MAX_TOKENS":
+		return nil, fmt.Errorf("response truncated: max tokens limit reached")
+	case "SAFETY":
+		return nil, fmt.Errorf("content blocked by safety filter")
+	case "RECITATION":
+		return nil, fmt.Errorf("content blocked due to recitation")
+	default:
 		return nil, fmt.Errorf("unexpected finish reason: %s", geminiResp.Candidates[0].FinishReason)
 	}
 

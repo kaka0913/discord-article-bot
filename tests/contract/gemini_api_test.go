@@ -1,14 +1,11 @@
 package contract
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/kaka0913/discord-article-bot/internal/config"
 	"github.com/kaka0913/discord-article-bot/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,32 +65,8 @@ func TestGeminiAPIArticleEvaluation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// クライアントを作成（モックサーバーのURLは後でリクエストで上書き）
-	client := llm.NewClient("test-api-key")
-
-	// APIのURLをモックサーバーに変更（テスト用の内部的な調整が必要）
-	// 注: 本来はClientにURLを設定可能にするか、環境変数で制御する方が良い
-	// ここではGenerateContentメソッドを直接テストする代わりに、
-	// Evaluatorを介してテストします
-
-	// 記事を準備
-	article := &config.Article{
-		Title:       "Building Microservices with Go and Kubernetes",
-		URL:         "https://example.com/article",
-		ContentText: "In this comprehensive guide, we explore best practices for building scalable microservices using the Go programming language and deploying them on Kubernetes clusters. We cover service mesh patterns, observability, and deployment strategies with actual code examples and deployment manifests...",
-		FetchedAt:   time.Now(),
-	}
-
-	// 注: 実際のテストではモックサーバーを使用するため、
-	// ここではクライアントのGenerateContentメソッドを直接テストします
-	ctx := context.Background()
-
-	// プロンプトを構築（簡易版）
-	prompt := `評価してください`
-
-	// 注: この部分は実際のAPIエンドポイントを使用する必要があるため、
-	// モックサーバーでのテストは制限があります。
-	// 代わりに、レスポンスのパースとバリデーションをテストします。
+	// 注: 実際のGemini APIを呼び出すテストはモックサーバーでは制限があるため、
+	// ここではレスポンスのパースとバリデーションをテストします。
 
 	t.Run("レスポンスのパース", func(t *testing.T) {
 		// モックレスポンスを直接パース
@@ -140,17 +113,11 @@ func TestGeminiAPIArticleEvaluation(t *testing.T) {
 		}
 
 		// テストケースを実行
-		assert.NoError(t, validateResult(validResult))
-		assert.Error(t, validateResult(invalidScore))
-		assert.Error(t, validateResult(invalidSummary))
-		assert.Error(t, validateResult(invalidTopics))
+		assert.NoError(t, llm.ValidateEvaluationResult(validResult))
+		assert.Error(t, llm.ValidateEvaluationResult(invalidScore))
+		assert.Error(t, llm.ValidateEvaluationResult(invalidSummary))
+		assert.Error(t, llm.ValidateEvaluationResult(invalidTopics))
 	})
-
-	// クライアント機能のテスト（モックサーバー使用は省略）
-	_ = client
-	_ = article
-	_ = ctx
-	_ = prompt
 }
 
 // TestGeminiAPIErrorHandling はGemini APIのエラーハンドリングをテストします
@@ -244,25 +211,4 @@ func TestRateLimiter(t *testing.T) {
 	// レート制限のテストは実際のタイミングに依存するため、
 	// ここではクライアントが正しく初期化されることを確認
 	assert.NotNil(t, client)
-}
-
-// validateResult は評価結果を検証します（テスト用ヘルパー）
-func validateResult(result *llm.EvaluationResult) error {
-	// スコアの範囲チェック
-	if result.RelevanceScore < 0 || result.RelevanceScore > 100 {
-		return assert.AnError
-	}
-
-	// 要約の長さチェック
-	summaryLen := len([]rune(result.Summary))
-	if summaryLen < 50 || summaryLen > 200 {
-		return assert.AnError
-	}
-
-	// スコアが0より大きい場合、一致するトピックが必要
-	if result.RelevanceScore > 0 && len(result.MatchingTopics) == 0 {
-		return assert.AnError
-	}
-
-	return nil
 }

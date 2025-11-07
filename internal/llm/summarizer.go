@@ -69,6 +69,6 @@ JSON形式で要約を提供してください:
   "summary": "<50-200文字の要約>"
 }`,
 		article.Title,
-		truncateContent(article.ContentText, 10000),
+		TruncateContent(article.ContentText, MaxPromptContentLength),
 	)
 }
