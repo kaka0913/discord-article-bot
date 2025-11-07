@@ -13,8 +13,7 @@ import (
 
 // Fetcher はRSSフィードのHTTPリクエストを担当する
 type Fetcher struct {
-	client  *http.Client
-	timeout time.Duration
+	client *http.Client
 }
 
 // NewFetcher は新しいFetcherインスタンスを作成する
@@ -23,7 +22,6 @@ func NewFetcher(timeout time.Duration) *Fetcher {
 		client: &http.Client{
 			Timeout: timeout,
 		},
-		timeout: timeout,
 	}
 }
 

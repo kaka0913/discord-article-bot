@@ -11,6 +11,12 @@ import (
 	"github.com/kaka0913/discord-article-bot/internal/logging"
 )
 
+const (
+	// maxTitleLength は記事タイトルの最大長
+	// 500文字以上のタイトルは異常に長いため切り詰める
+	maxTitleLength = 500
+)
+
 // Article は取得したRSS記事を表す
 type Article struct {
 	Title         string    // 記事のタイトル
@@ -70,8 +76,8 @@ func (p *Parser) Parse(ctx context.Context, xmlData []byte, sourceFeedName strin
 
 		// タイトルをサニタイズ（前後の空白を削除）
 		title := strings.TrimSpace(item.Title)
-		if len(title) > 500 {
-			title = title[:500] // タイトルが長すぎる場合は切り詰める
+		if len(title) > maxTitleLength {
+			title = title[:maxTitleLength]
 		}
 
 		// 公開日時を取得（存在しない場合は現在時刻を使用）

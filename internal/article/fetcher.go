@@ -11,10 +11,15 @@ import (
 	"github.com/kaka0913/discord-article-bot/internal/logging"
 )
 
+const (
+	// maxHTMLSize はHTML取得時の最大サイズ（10MB）
+	// 10MBを超えるHTMLは異常に大きいため拒否する
+	maxHTMLSize = 10 * 1024 * 1024
+)
+
 // Fetcher は記事のHTMLコンテンツの取得を担当する
 type Fetcher struct {
-	client  *http.Client
-	timeout time.Duration
+	client *http.Client
 }
 
 // NewFetcher は新しいFetcherインスタンスを作成する
@@ -23,7 +28,6 @@ func NewFetcher(timeout time.Duration) *Fetcher {
 		client: &http.Client{
 			Timeout: timeout,
 		},
-		timeout: timeout,
 	}
 }
 
@@ -76,12 +80,11 @@ func (f *Fetcher) Fetch(ctx context.Context, url string) (string, error) {
 		return "", errors.New(errors.ErrorTypeArticle, "記事HTMLが空")
 	}
 
-	// 最大サイズを制限（10MB）
-	const maxSize = 10 * 1024 * 1024
-	if len(body) > maxSize {
+	// 最大サイズを制限
+	if len(body) > maxHTMLSize {
 		return "", errors.New(
 			errors.ErrorTypeArticle,
-			fmt.Sprintf("記事HTMLが大きすぎる: %d bytes (最大 %d bytes)", len(body), maxSize),
+			fmt.Sprintf("記事HTMLが大きすぎる: %d bytes (最大 %d bytes)", len(body), maxHTMLSize),
 		)
 	}
 
@@ -91,5 +94,5 @@ func (f *Fetcher) Fetch(ctx context.Context, url string) (string, error) {
 
 // containsHTML はContent-Typeヘッダーにtext/htmlが含まれているかを確認する
 func containsHTML(contentType string) bool {
-	return len(contentType) >= 9 && contentType[:9] == "text/html"
+	return strings.Contains(strings.ToLower(contentType), "text/html")
 }
