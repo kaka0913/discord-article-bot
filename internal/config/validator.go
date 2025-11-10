@@ -16,6 +16,9 @@ const (
 	MaxSummaryLength = 200
 )
 
+// グローバルバリデーター（パフォーマンス最適化のため一度だけ初期化）
+var globalValidator = validator.New()
+
 // Validator は設定を検証するためのインターフェース
 type Validator interface {
 	Validate(config *Config) error
@@ -73,8 +76,7 @@ func (v *configValidator) Validate(config *Config) error {
 
 // ValidateArticle は記事の妥当性を検証します
 func ValidateArticle(article *Article) error {
-	validate := validator.New()
-	if err := validate.Struct(article); err != nil {
+	if err := globalValidator.Struct(article); err != nil {
 		return fmt.Errorf("記事の検証に失敗しました: %w", err)
 	}
 
@@ -97,8 +99,7 @@ func ValidateArticle(article *Article) error {
 
 // ValidateArticleEvaluation は記事評価の妥当性を検証します
 func ValidateArticleEvaluation(eval *ArticleEvaluation) error {
-	validate := validator.New()
-	if err := validate.Struct(eval); err != nil {
+	if err := globalValidator.Struct(eval); err != nil {
 		return fmt.Errorf("記事評価の検証に失敗しました: %w", err)
 	}
 

@@ -35,10 +35,7 @@ func (c *Client) SaveRejectedArticle(ctx context.Context, articleURL, reason str
 
 	if relevanceScore != nil {
 		rejectedArticle["relevance_score"] = *relevanceScore
-	} else {
-		rejectedArticle["relevance_score"] = nil
 	}
-
 	_, err := docRef.Set(ctx, rejectedArticle)
 	if err != nil {
 		return fmt.Errorf("failed to save rejected article: %w", err)

@@ -89,11 +89,21 @@ RSS記事キュレーションBot（discord-article-bot）
 ├── go.mod               # Go依存関係管理
 ├── go.sum               # Go依存関係チェックサム
 ├── cloudbuild.yaml      # Cloud Build設定
-├── internal/            # 内部パッケージ（実装済み）
+├── cmd/                 # エントリーポイント（✅ T007, T008完了）
+│   ├── curator/         # Cloud Functions本番環境用
+│   └── local-test/      # ローカルテスト用
+├── internal/            # 内部パッケージ（✅ すべて実装済み）
 │   ├── config/          # 設定管理（✅ T002完了）
 │   ├── secrets/         # Secret Manager統合（✅ T002完了）
 │   ├── errors/          # エラーハンドリング（✅ T002完了）
-│   └── logging/         # ロギング（✅ T002完了）
+│   ├── logging/         # ロギング（✅ T002完了）
+│   ├── storage/         # Firestore操作（✅ T003完了）
+│   ├── rss/             # RSSフィード処理（✅ T004完了）
+│   ├── article/         # 記事コンテンツ抽出（✅ T004完了）
+│   ├── llm/             # Gemini API統合（✅ T005完了、サマリー機能追加済み）
+│   └── discord/         # Discord通知（✅ T006完了）
+├── tests/               # テストファイル（契約テスト実装済み）
+│   └── contract/        # 契約テスト（Discord, Firestore, Gemini, RSS）
 ├── terraform/           # インフラストラクチャコード（✅ T001完了）
 │   ├── README.md
 │   ├── environments/
@@ -115,25 +125,22 @@ RSS記事キュレーションBot（discord-article-bot）
         └── checklists/      # チェックリスト
 ```
 
-### 計画中の構造（未実装）
+### 最近追加された機能
 
-以下のディレクトリとパッケージは[tasks.md](./specs/001-rss-article-curator/tasks.md)で定義されており、今後実装予定です:
+以下の機能が最近追加されました:
 
-```
-.
-├── cmd/
-│   └── curator/          # Cloud Functionsエントリポイント（T007で実装予定）
-├── internal/
-│   ├── rss/             # RSSフィード処理（T004で実装予定）
-│   ├── article/         # 記事コンテンツ抽出（T004で実装予定）
-│   ├── llm/             # Gemini API統合（T005で実装予定）
-│   ├── storage/         # Firestore操作（T003で実装予定）
-│   └── discord/         # Discord通知（T006で実装予定）
-└── tests/               # テストファイル（各タスクで実装予定）
-    ├── contract/        # 契約テスト
-    ├── integration/     # 統合テスト
-    └── unit/           # ユニットテスト
-```
+1. **記事全体サマリー機能** (2025-11-10追加)
+   - `internal/llm/summarizer.go` - 複数記事の全体サマリー生成
+   - Gemini API v2.0を使用
+   - 記事全体の傾向分析と推薦機能
+
+2. **Gemini API v2.0対応** (2025-11-10)
+   - 無料版の制限に対応
+   - レート制限の調整
+
+3. **ローカルテスト環境** (2025-11-10)
+   - `cmd/local-test/main.go` - Firestoreエミュレータ対応
+   - API制限考慮（3記事制限）
 
 ## 重要なドキュメント
 
@@ -437,9 +444,36 @@ CONFIG_URL=https://raw.githubusercontent.com/your-repo/main/config.json
 - [Gemini API ドキュメント](https://ai.google.dev/docs)
 - [Discord Webhook ガイド](https://discord.com/developers/docs/resources/webhook)
 
+## 現在の進捗状況
+
+**実装タスク**: 8/9タスク完了
+
+- [x] T001: infrastructure (Terraform構築) ✅
+- [x] T002: config-utils (設定管理とユーティリティ) ✅
+- [x] T003: firestore-deduplication (Firestore重複排除) ✅
+- [x] T004: rss-article-fetcher (RSS記事取得) ✅
+- [x] T005: gemini-integration (Gemini API統合) ✅
+- [x] T006: discord-notification (Discord通知) ✅
+- [x] T007: main-orchestration (メインオーケストレーション) ✅
+- [x] T008: local-testing (ローカルテスト) ✅
+- [ ] T009: gcp-deployment (GCPデプロイとCI/CD) 🔄 **次のタスク**
+
+**次のステップ**: T009 (GCPデプロイとCI/CD) のみ残っています。すべての実装とローカルテストは完了済みです。
+
+詳細は[tasks.md](./specs/001-rss-article-curator/tasks.md)を参照してください。
+
 ## 変更履歴
 
-このドキュメントはプロジェクトの進化に応じて更新されます。重要な変更があった場合は、このセクションに記録してください。
+### 2025-11-10
+- 記事全体サマリー機能を追加 (`internal/llm/summarizer.go`)
+- Gemini API v2.0に更新（無料版制限対応）
+- ローカルテスト環境を整備 (`cmd/local-test/`)
+- T003〜T008の実装完了
+- AGENT.mdとtasks.mdの進捗状況を更新
+
+### 初版
+- プロジェクト構造とワークフロー定義
+- T001, T002の実装完了
 
 ---
 

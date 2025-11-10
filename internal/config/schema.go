@@ -85,13 +85,6 @@ type ArticleEvaluation struct {
 	IsRelevant     bool      `json:"is_relevant"`
 }
 
-// CuratedArticle は選択された記事と評価の組み合わせを表します
-type CuratedArticle struct {
-	Article    Article           `json:"article"`
-	Evaluation ArticleEvaluation `json:"evaluation"`
-	Rank       int               `json:"rank" validate:"min=1,max=10"`
-}
-
 // NotifiedArticle はDiscordに通知済みの記事を表します（Firestore保存用）
 type NotifiedArticle struct {
 	NotifiedAt       time.Time `firestore:"notified_at"`

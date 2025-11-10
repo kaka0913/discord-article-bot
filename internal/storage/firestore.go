@@ -40,12 +40,18 @@ func (c *Client) GetClient() *firestore.Client {
 	return c.client
 }
 
-// urlToDocID はURLをFirestoreドキュメントIDに変換します
+// UrlToDocID はURLをFirestoreドキュメントIDに変換します
 // SHA256ハッシュを使用することで、以下の問題を解決します：
 // - クエリパラメータ（?、&、=）や特殊文字への対応
 // - Firestoreのドキュメント文字列制限（1,500バイト）への対応
 // - URLエンコード文字への対応
-func urlToDocID(url string) string {
+// この関数はエクスポートされており、テストコードから使用できます
+func UrlToDocID(url string) string {
 	hash := sha256.Sum256([]byte(url))
 	return hex.EncodeToString(hash[:])
+}
+
+// 下位互換性のための内部エイリアス
+func urlToDocID(url string) string {
+	return UrlToDocID(url)
 }

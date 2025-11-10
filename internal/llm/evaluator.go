@@ -47,6 +47,14 @@ func (e *Evaluator) EvaluateArticle(
 		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}
 
+	// 応答の安全性チェック
+	if len(response.Candidates) == 0 {
+		return nil, fmt.Errorf("no candidates in response")
+	}
+	if len(response.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("no parts in candidate content")
+	}
+
 	// 応答からJSONテキストを抽出
 	jsonText := response.Candidates[0].Content.Parts[0].Text
 
@@ -79,11 +87,7 @@ func (e *Evaluator) EvaluateArticle(
 
 // buildEvaluationPrompt は評価用のプロンプトを構築します
 func buildEvaluationPrompt(article *config.Article, topics []string) string {
-	topicsJSON, err := json.Marshal(topics)
-	if err != nil {
-		// topics []stringのマーシャルは基本的に失敗しないが、念のため空配列として扱う
-		topicsJSON = []byte("[]")
-	}
+	topicsJSON, _ := json.Marshal(topics) // []string のマーシャルは常に成功する
 
 	return fmt.Sprintf(`あなたは技術コンテンツキュレーションの専門家です。以下の記事を次のトピックとの関連性について評価してください: %s
 
