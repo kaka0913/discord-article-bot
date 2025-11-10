@@ -17,13 +17,35 @@
     }
   ],
   "interests": [
-    "Go言語",
-    "クラウドアーキテクチャ",
-    "サーバーレス",
-    "機械学習",
-    "DevOps"
+    {
+      "topic": "Go言語",
+      "aliases": ["Golang", "Go"],
+      "priority": "high"
+    },
+    {
+      "topic": "クラウドアーキテクチャ",
+      "aliases": ["AWS", "GCP", "Azure"],
+      "priority": "high"
+    },
+    {
+      "topic": "サーバーレス",
+      "aliases": ["Serverless", "Cloud Functions", "Lambda"],
+      "priority": "medium"
+    },
+    {
+      "topic": "機械学習",
+      "aliases": ["Machine Learning", "ML", "AI"],
+      "priority": "medium"
+    },
+    {
+      "topic": "DevOps",
+      "aliases": ["CI/CD", "Infrastructure"],
+      "priority": "low"
+    }
   ],
-  "article_count": 5,
-  "score_threshold": 70,
-  "schedule": "0 9 * * *"
+  "notification_settings": {
+    "max_articles": 5,
+    "min_articles": 1,
+    "min_relevance_score": 70
+  }
 }
