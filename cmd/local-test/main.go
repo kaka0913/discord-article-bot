@@ -1,4 +1,4 @@
-// Package main はRSS記事キュレーションBotのCloud Functionsエントリーポイントです
+// Package main はローカル環境でのテスト用エントリーポイントです
 package main
 
 import (
@@ -9,9 +9,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
-	"github.com/cloudevents/sdk-go/v2/event"
+	"github.com/joho/godotenv"
 
 	"github.com/kaka0913/discord-article-bot/internal/article"
 	"github.com/kaka0913/discord-article-bot/internal/config"
@@ -23,78 +21,64 @@ import (
 	"github.com/kaka0913/discord-article-bot/internal/storage"
 )
 
-func init() {
-	// Cloud Functionsイベントハンドラーを登録
-	functions.CloudEvent("CurateArticles", curateArticles)
-}
-
 func main() {
-	// Cloud Functionsフレームワークを起動
-	// PORT環境変数が設定されている場合、HTTPサーバーとして起動
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// .envファイルを読み込む
+	if err := godotenv.Load(); err != nil {
+		log.Printf("警告: .envファイルの読み込みに失敗しました: %v", err)
 	}
-	if err := funcframework.Start(port); err != nil {
-		log.Fatalf("funcframework.Start: %v\n", err)
-	}
-}
 
-// curateArticles はPub/Subトリガーによって実行されるメイン処理
-func curateArticles(ctx context.Context, e event.Event) error {
 	// ロガーを作成
 	logger := logging.NewLogger()
-	ctx = logging.ToContext(ctx, logger)
+	ctx := logging.ToContext(context.Background(), logger)
 
-	logger.Info("記事キュレーション処理を開始します")
+	logger.Info("ローカルテスト: 記事キュレーション処理を開始します")
 
 	// 環境変数を取得
 	projectID := os.Getenv("GCP_PROJECT_ID")
 	if projectID == "" {
-		return fmt.Errorf("GCP_PROJECT_ID環境変数が設定されていません")
+		log.Fatal("GCP_PROJECT_ID環境変数が設定されていません")
 	}
 
-	configSource := os.Getenv("CONFIG_SOURCE")
-	if configSource == "" {
-		// デフォルトはローカルのconfig.json
-		configSource = "config.json"
+	discordWebhookURL := os.Getenv("DISCORD_WEBHOOK_URL")
+	if discordWebhookURL == "" {
+		log.Fatal("DISCORD_WEBHOOK_URL環境変数が設定されていません")
 	}
 
-	// Secret Managerクライアントを初期化
-	secretMgr, err := secrets.NewManager(ctx, projectID)
-	if err != nil {
-		return fmt.Errorf("Secret Managerクライアントの初期化に失敗: %w", err)
+	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
+	if geminiAPIKey == "" {
+		log.Fatal("GEMINI_API_KEY環境変数が設定されていません")
 	}
+
+	// Firestore エミュレータの設定
+	firestoreEmulator := os.Getenv("FIRESTORE_EMULATOR_HOST")
+	if firestoreEmulator != "" {
+		logger.Info("Firestoreエミュレータを使用します", "host", firestoreEmulator)
+	}
+
+	// モックSecret Managerを使用（ローカルテスト用）
+	secretMgr := secrets.NewMockManager(map[string]string{
+		"discord-webhook-url": discordWebhookURL,
+		"gemini-api-key":      geminiAPIKey,
+	})
 	defer secretMgr.Close()
-
-	// シークレットを取得
-	discordWebhookURL, err := secretMgr.GetSecret(ctx, "discord-webhook-url")
-	if err != nil {
-		return fmt.Errorf("Discord Webhook URLの取得に失敗: %w", err)
-	}
-
-	geminiAPIKey, err := secretMgr.GetSecret(ctx, "gemini-api-key")
-	if err != nil {
-		return fmt.Errorf("Gemini APIキーの取得に失敗: %w", err)
-	}
 
 	// Firestoreクライアントを初期化
 	firestoreClient, err := storage.NewClient(ctx, projectID)
 	if err != nil {
-		return fmt.Errorf("Firestoreクライアントの初期化に失敗: %w", err)
+		log.Fatalf("Firestoreクライアントの初期化に失敗: %v", err)
 	}
 	defer firestoreClient.Close()
 
-	// 設定を読み込む
+	// 設定を読み込む（ローカルのconfig.jsonを使用）
 	configLoader := config.NewLoader()
-	cfg, err := configLoader.Load(ctx, configSource)
+	cfg, err := configLoader.Load(ctx, "config.json")
 	if err != nil {
-		return fmt.Errorf("設定の読み込みに失敗: %w", err)
+		log.Fatalf("設定の読み込みに失敗: %v", err)
 	}
 
 	// 設定を検証
 	if err := config.ValidateConfig(cfg); err != nil {
-		return fmt.Errorf("設定の検証に失敗: %w", err)
+		log.Fatalf("設定の検証に失敗: %v", err)
 	}
 
 	logger.Info("設定を読み込みました",
@@ -103,7 +87,7 @@ func curateArticles(ctx context.Context, e event.Event) error {
 		"maxArticles", cfg.NotificationSettings.MaxArticles,
 	)
 
-	// 依存関係を初期化（設定値から取得）
+	// 依存関係を初期化
 	rssFetcher := rss.NewFetcher(time.Duration(cfg.TimeoutSettings.RSSFetchTimeoutSeconds) * time.Second)
 	rssParser := rss.NewParser()
 	articleFetcher := article.NewFetcher(time.Duration(cfg.TimeoutSettings.ArticleFetchTimeoutSeconds) * time.Second)
@@ -126,11 +110,10 @@ func curateArticles(ctx context.Context, e event.Event) error {
 		logger,
 	); err != nil {
 		logger.Error("記事キュレーション処理に失敗しました", "error", err)
-		return err
+		os.Exit(1)
 	}
 
 	logger.Info("記事キュレーション処理が正常に完了しました")
-	return nil
 }
 
 // orchestrateCuration はメインのオーケストレーションロジックを実行します
@@ -157,7 +140,7 @@ func orchestrateCuration(
 		// RSSフィードを取得
 		xmlData, err := rssFetcher.Fetch(ctx, source.URL)
 		if err != nil {
-			// エラーをログに記録して続行（FR-014: 1つのソースが失敗しても処理を続行）
+			// エラーをログに記録して続行
 			logger.Error("RSSフィードの取得に失敗しました。スキップします", "source", source.Name, "error", err)
 			continue
 		}
@@ -180,7 +163,7 @@ func orchestrateCuration(
 
 	logger.Info("すべてのRSSフィードから記事を取得しました", "totalCount", len(allArticles))
 
-	// 2. 重複チェック（通知済み・却下済み記事を除外）
+	// 2. 重複チェック
 	logger.Info("重複チェックを実行中")
 	filteredArticles := []rss.Article{}
 	var firestoreErrorCount int
@@ -196,7 +179,6 @@ func orchestrateCuration(
 			if firestoreErrorCount >= maxFirestoreErrors {
 				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
 			}
-			// エラー時は安全側に倒して処理を続行（重複のリスクはあるが、記事を見逃すよりまし）
 			filteredArticles = append(filteredArticles, article)
 			continue
 		}
@@ -213,7 +195,6 @@ func orchestrateCuration(
 			if firestoreErrorCount >= maxFirestoreErrors {
 				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
 			}
-			// エラー時は安全側に倒して処理を続行
 			filteredArticles = append(filteredArticles, article)
 			continue
 		}
@@ -248,12 +229,19 @@ func orchestrateCuration(
 		interestTopics[i] = interest.Topic
 	}
 
-	for _, rssArticle := range filteredArticles {
+	// ローカルテスト: 無料版API制限を考慮して3記事に制限
+	maxTestArticles := 3
+	testArticles := filteredArticles
+	if len(testArticles) > maxTestArticles {
+		testArticles = testArticles[:maxTestArticles]
+		logger.Info("ローカルテスト: API制限のため評価記事数を制限", "limit", maxTestArticles)
+	}
+
+	for _, rssArticle := range testArticles {
 		// 記事HTMLを取得
 		htmlContent, err := articleFetcher.Fetch(ctx, rssArticle.URL)
 		if err != nil {
 			logger.Warn("記事HTMLの取得に失敗しました。スキップします", "url", rssArticle.URL, "error", err)
-			// コンテンツ抽出失敗として記録
 			if saveErr := firestoreClient.SaveRejectedArticle(ctx, rssArticle.URL, config.ReasonContentExtractionFailed, nil); saveErr != nil {
 				logger.Error("却下記事の保存に失敗", "url", rssArticle.URL, "error", saveErr)
 			}
@@ -264,7 +252,6 @@ func orchestrateCuration(
 		extractedTitle, extractedText, err := articleExtractor.ExtractWithTitle(ctx, htmlContent, rssArticle.URL)
 		if err != nil {
 			logger.Warn("記事本文の抽出に失敗しました。スキップします", "url", rssArticle.URL, "error", err)
-			// コンテンツ抽出失敗として記録
 			if saveErr := firestoreClient.SaveRejectedArticle(ctx, rssArticle.URL, config.ReasonContentExtractionFailed, nil); saveErr != nil {
 				logger.Error("却下記事の保存に失敗", "url", rssArticle.URL, "error", saveErr)
 			}
@@ -303,7 +290,6 @@ func orchestrateCuration(
 		// 関連性がない記事は却下
 		if !evaluation.IsRelevant {
 			logger.Debug("関連性がない記事を却下", "url", rssArticle.URL, "score", evaluation.RelevanceScore)
-			// 却下理由を判定して保存
 			reason := config.ReasonLowRelevance
 			if len(evaluation.MatchingTopics) == 0 {
 				reason = config.ReasonNoTopicMatch
@@ -324,12 +310,11 @@ func orchestrateCuration(
 		return nil
 	}
 
-	// 4. スコア順にソートして上位記事を選択
+	// 4. スコア順にソート
 	sort.Slice(evaluatedArticles, func(i, j int) bool {
 		return evaluatedArticles[i].RelevanceScore > evaluatedArticles[j].RelevanceScore
 	})
 
-	// 最大記事数を超える場合は切り詰める
 	maxArticles := cfg.NotificationSettings.MaxArticles
 	if len(evaluatedArticles) > maxArticles {
 		evaluatedArticles = evaluatedArticles[:maxArticles]
@@ -338,7 +323,6 @@ func orchestrateCuration(
 	logger.Info("上位記事を選択しました", "count", len(evaluatedArticles))
 
 	// 5. Discord通知用のペイロードを作成
-	// パフォーマンス最適化: 記事URLからの高速検索用マップを作成（O(n²) → O(n)）
 	articlesByURL := make(map[string]rss.Article, len(filteredArticles))
 	for _, article := range filteredArticles {
 		articlesByURL[article.URL] = article
@@ -346,7 +330,6 @@ func orchestrateCuration(
 
 	discordArticles := make([]discord.Article, len(evaluatedArticles))
 	for i, eval := range evaluatedArticles {
-		// マップから記事を取得（O(1)検索）
 		article, ok := articlesByURL[eval.ArticleURL]
 		title := "Unknown"
 		sourceFeed := "Unknown"
@@ -390,7 +373,11 @@ func orchestrateCuration(
 		logger.Warn("サマリー生成に失敗しました。サマリーなしで通知します", "error", err)
 		summaryResult = nil
 	} else {
-		logger.Info("サマリー生成に成功しました")
+		logger.Info("サマリー生成に成功しました",
+			"overallSummary", summaryResult.OverallSummary,
+			"mustRead", summaryResult.MustRead,
+			"recommendations", len(summaryResult.Recommendations),
+		)
 	}
 
 	// Discord用のサマリーに変換
@@ -417,7 +404,6 @@ func orchestrateCuration(
 	// 8. 通知済み記事をFirestoreに保存
 	logger.Info("通知済み記事をFirestoreに保存中")
 	for _, eval := range evaluatedArticles {
-		// マップから記事タイトルを取得（O(1)検索）
 		article, ok := articlesByURL[eval.ArticleURL]
 		title := "Unknown"
 		if ok {
@@ -425,7 +411,6 @@ func orchestrateCuration(
 		}
 		if err := firestoreClient.SaveNotifiedArticle(ctx, eval.ArticleURL, messageID, title, eval.RelevanceScore); err != nil {
 			logger.Error("通知済み記事の保存に失敗", "url", eval.ArticleURL, "error", err)
-			// エラーをログに記録するが、処理は続行
 		}
 	}
 

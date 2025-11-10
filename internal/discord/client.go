@@ -87,9 +87,9 @@ type ErrorResponse struct {
 }
 
 // PostArticles は記事リストをDiscordに投稿
-func (c *Client) PostArticles(ctx context.Context, articles []Article, date string) (string, error) {
+func (c *Client) PostArticles(ctx context.Context, articles []Article, date string, summary *ArticlesSummary) (string, error) {
 	// Embedsペイロードをフォーマット
-	payload := FormatArticlesPayload(articles, date)
+	payload := FormatArticlesPayload(articles, date, summary)
 
 	// ペイロードの検証
 	if len(payload.Embeds) > 10 {
@@ -181,6 +181,12 @@ func (c *Client) post(ctx context.Context, payload WebhookPayload) (string, erro
 	// ステータスコードをチェック
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return "", c.handleErrorResponse(resp.StatusCode, body)
+	}
+
+	// 204 No Contentの場合はbodyが空なのでダミーIDを返す
+	if resp.StatusCode == http.StatusNoContent || len(body) == 0 {
+		c.logger.Info("Discordへのメッセージ送信に成功しました (No Content)")
+		return "success-no-content", nil
 	}
 
 	// 成功レスポンスをパース
