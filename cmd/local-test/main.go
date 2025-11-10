@@ -108,6 +108,7 @@ func main() {
 		discordClient,
 		firestoreClient,
 		logger,
+		3, // ローカルテストではAPI制限のため3件に制限
 	); err != nil {
 		logger.Error("記事キュレーション処理に失敗しました", "error", err)
 		os.Exit(1)
@@ -128,6 +129,7 @@ func orchestrateCuration(
 	discordClient *discord.Client,
 	firestoreClient *storage.Client,
 	logger logging.Logger,
+	maxEvaluationArticles int, // 評価する記事の最大数（0=無制限、ローカルテストでは3）
 ) error {
 	// 1. RSSフィードから記事を取得
 	logger.Info("RSSフィードから記事を取得中")
@@ -140,7 +142,7 @@ func orchestrateCuration(
 		// RSSフィードを取得
 		xmlData, err := rssFetcher.Fetch(ctx, source.URL)
 		if err != nil {
-			// エラーをログに記録して続行
+			// エラーをログに記録して続行（FR-014: 1つのソースが失敗しても処理を続行）
 			logger.Error("RSSフィードの取得に失敗しました。スキップします", "source", source.Name, "error", err)
 			continue
 		}
@@ -163,7 +165,7 @@ func orchestrateCuration(
 
 	logger.Info("すべてのRSSフィードから記事を取得しました", "totalCount", len(allArticles))
 
-	// 2. 重複チェック
+	// 2. 重複チェック（通知済み・却下済み記事を除外）
 	logger.Info("重複チェックを実行中")
 	filteredArticles := []rss.Article{}
 	var firestoreErrorCount int
@@ -179,6 +181,7 @@ func orchestrateCuration(
 			if firestoreErrorCount >= maxFirestoreErrors {
 				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
 			}
+			// エラー時は安全側に倒して処理を続行（重複のリスクはあるが、記事を見逃すよりまし）
 			filteredArticles = append(filteredArticles, article)
 			continue
 		}
@@ -195,6 +198,7 @@ func orchestrateCuration(
 			if firestoreErrorCount >= maxFirestoreErrors {
 				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
 			}
+			// エラー時は安全側に倒して処理を続行
 			filteredArticles = append(filteredArticles, article)
 			continue
 		}
@@ -219,6 +223,16 @@ func orchestrateCuration(
 		return nil
 	}
 
+	// 2.5. 記事数を制限（ローカルテスト用）
+	if maxEvaluationArticles > 0 && len(filteredArticles) > maxEvaluationArticles {
+		logger.Info("記事数を制限します",
+			"originalCount", len(filteredArticles),
+			"limitedCount", maxEvaluationArticles,
+			"reason", "API制限またはテスト環境",
+		)
+		filteredArticles = filteredArticles[:maxEvaluationArticles]
+	}
+
 	// 3. 記事コンテンツを取得して評価
 	logger.Info("記事を評価中")
 	evaluatedArticles := []config.ArticleEvaluation{}
@@ -229,19 +243,12 @@ func orchestrateCuration(
 		interestTopics[i] = interest.Topic
 	}
 
-	// ローカルテスト: 無料版API制限を考慮して3記事に制限
-	maxTestArticles := 3
-	testArticles := filteredArticles
-	if len(testArticles) > maxTestArticles {
-		testArticles = testArticles[:maxTestArticles]
-		logger.Info("ローカルテスト: API制限のため評価記事数を制限", "limit", maxTestArticles)
-	}
-
-	for _, rssArticle := range testArticles {
+	for _, rssArticle := range filteredArticles {
 		// 記事HTMLを取得
 		htmlContent, err := articleFetcher.Fetch(ctx, rssArticle.URL)
 		if err != nil {
 			logger.Warn("記事HTMLの取得に失敗しました。スキップします", "url", rssArticle.URL, "error", err)
+			// コンテンツ抽出失敗として記録
 			if saveErr := firestoreClient.SaveRejectedArticle(ctx, rssArticle.URL, config.ReasonContentExtractionFailed, nil); saveErr != nil {
 				logger.Error("却下記事の保存に失敗", "url", rssArticle.URL, "error", saveErr)
 			}
@@ -252,6 +259,7 @@ func orchestrateCuration(
 		extractedTitle, extractedText, err := articleExtractor.ExtractWithTitle(ctx, htmlContent, rssArticle.URL)
 		if err != nil {
 			logger.Warn("記事本文の抽出に失敗しました。スキップします", "url", rssArticle.URL, "error", err)
+			// コンテンツ抽出失敗として記録
 			if saveErr := firestoreClient.SaveRejectedArticle(ctx, rssArticle.URL, config.ReasonContentExtractionFailed, nil); saveErr != nil {
 				logger.Error("却下記事の保存に失敗", "url", rssArticle.URL, "error", saveErr)
 			}
@@ -290,6 +298,7 @@ func orchestrateCuration(
 		// 関連性がない記事は却下
 		if !evaluation.IsRelevant {
 			logger.Debug("関連性がない記事を却下", "url", rssArticle.URL, "score", evaluation.RelevanceScore)
+			// 却下理由を判定して保存
 			reason := config.ReasonLowRelevance
 			if len(evaluation.MatchingTopics) == 0 {
 				reason = config.ReasonNoTopicMatch
@@ -310,11 +319,12 @@ func orchestrateCuration(
 		return nil
 	}
 
-	// 4. スコア順にソート
+	// 4. スコア順にソートして上位記事を選択
 	sort.Slice(evaluatedArticles, func(i, j int) bool {
 		return evaluatedArticles[i].RelevanceScore > evaluatedArticles[j].RelevanceScore
 	})
 
+	// 最大記事数を超える場合は切り詰める
 	maxArticles := cfg.NotificationSettings.MaxArticles
 	if len(evaluatedArticles) > maxArticles {
 		evaluatedArticles = evaluatedArticles[:maxArticles]
@@ -323,6 +333,7 @@ func orchestrateCuration(
 	logger.Info("上位記事を選択しました", "count", len(evaluatedArticles))
 
 	// 5. Discord通知用のペイロードを作成
+	// パフォーマンス最適化: 記事URLからの高速検索用マップを作成（O(n²) → O(n)）
 	articlesByURL := make(map[string]rss.Article, len(filteredArticles))
 	for _, article := range filteredArticles {
 		articlesByURL[article.URL] = article
@@ -330,6 +341,7 @@ func orchestrateCuration(
 
 	discordArticles := make([]discord.Article, len(evaluatedArticles))
 	for i, eval := range evaluatedArticles {
+		// マップから記事を取得（O(1)検索）
 		article, ok := articlesByURL[eval.ArticleURL]
 		title := "Unknown"
 		sourceFeed := "Unknown"
@@ -373,11 +385,7 @@ func orchestrateCuration(
 		logger.Warn("サマリー生成に失敗しました。サマリーなしで通知します", "error", err)
 		summaryResult = nil
 	} else {
-		logger.Info("サマリー生成に成功しました",
-			"overallSummary", summaryResult.OverallSummary,
-			"mustRead", summaryResult.MustRead,
-			"recommendations", len(summaryResult.Recommendations),
-		)
+		logger.Info("サマリー生成に成功しました")
 	}
 
 	// Discord用のサマリーに変換
@@ -404,6 +412,7 @@ func orchestrateCuration(
 	// 8. 通知済み記事をFirestoreに保存
 	logger.Info("通知済み記事をFirestoreに保存中")
 	for _, eval := range evaluatedArticles {
+		// マップから記事タイトルを取得（O(1)検索）
 		article, ok := articlesByURL[eval.ArticleURL]
 		title := "Unknown"
 		if ok {
@@ -411,6 +420,7 @@ func orchestrateCuration(
 		}
 		if err := firestoreClient.SaveNotifiedArticle(ctx, eval.ArticleURL, messageID, title, eval.RelevanceScore); err != nil {
 			logger.Error("通知済み記事の保存に失敗", "url", eval.ArticleURL, "error", err)
+			// エラーをログに記録するが、処理は続行
 		}
 	}
 

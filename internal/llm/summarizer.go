@@ -35,6 +35,14 @@ func (e *Evaluator) GenerateArticlesSummary(
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
 
+	// 応答の安全性チェック
+	if len(response.Candidates) == 0 {
+		return nil, fmt.Errorf("no candidates in response")
+	}
+	if len(response.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("no parts in candidate content")
+	}
+
 	// 応答からJSONテキストを抽出
 	jsonText := response.Candidates[0].Content.Parts[0].Text
 
@@ -52,7 +60,7 @@ func (e *Evaluator) GenerateArticlesSummary(
 
 // buildSummaryPrompt はサマリー生成用のプロンプトを構築します
 func buildSummaryPrompt(articles []ArticleForSummary) string {
-	// 記事情報をJSON形式で整形
+	// 記事情報をJSON形式で整形 (構造体のマーシャルは常に成功する)
 	articlesJSON, _ := json.MarshalIndent(articles, "", "  ")
 
 	// recommendations配列の例を動的に生成
