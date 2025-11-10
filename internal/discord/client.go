@@ -87,9 +87,9 @@ type ErrorResponse struct {
 }
 
 // PostArticles は記事リストをDiscordに投稿
-func (c *Client) PostArticles(ctx context.Context, articles []Article, date string) (string, error) {
+func (c *Client) PostArticles(ctx context.Context, articles []Article, date string, summary *ArticlesSummary) (string, error) {
 	// Embedsペイロードをフォーマット
-	payload := FormatArticlesPayload(articles, date)
+	payload := FormatArticlesPayload(articles, date, summary)
 
 	// ペイロードの検証
 	if len(payload.Embeds) > 10 {

@@ -17,10 +17,24 @@ const (
 	defaultEmbedColor = 5814783
 )
 
-// FormatArticlesPayload は記事リストをDiscord Webhook用のペイロードにフォーマット
-func FormatArticlesPayload(articles []Article, date string) WebhookPayload {
-	embeds := make([]EmbedObject, 0, len(articles))
+// ArticlesSummary は記事全体のサマリー情報
+type ArticlesSummary struct {
+	OverallSummary  string
+	MustRead        string
+	Recommendations []string
+}
 
+// FormatArticlesPayload は記事リストをDiscord Webhook用のペイロードにフォーマット
+func FormatArticlesPayload(articles []Article, date string, summary *ArticlesSummary) WebhookPayload {
+	embeds := make([]EmbedObject, 0, len(articles)+1)
+
+	// サマリーが提供されている場合、最初にサマリーEmbedを追加
+	if summary != nil {
+		summaryEmbed := formatSummaryEmbed(summary, len(articles))
+		embeds = append(embeds, summaryEmbed)
+	}
+
+	// 各記事のEmbedを追加
 	for _, article := range articles {
 		embed := formatArticleEmbed(article)
 		embeds = append(embeds, embed)
@@ -29,6 +43,40 @@ func FormatArticlesPayload(articles []Article, date string) WebhookPayload {
 	return WebhookPayload{
 		Content: fmt.Sprintf("📰 Daily Tech Article Digest - %s", date),
 		Embeds:  embeds,
+	}
+}
+
+// formatSummaryEmbed はサマリー情報をEmbedオブジェクトにフォーマット
+func formatSummaryEmbed(summary *ArticlesSummary, articleCount int) EmbedObject {
+	// サマリーの説明文を構築
+	var descriptionParts []string
+
+	// 全体サマリー
+	if summary.OverallSummary != "" {
+		descriptionParts = append(descriptionParts, fmt.Sprintf("**📋 今日のハイライト**\n%s", summary.OverallSummary))
+	}
+
+	// 必読記事
+	if summary.MustRead != "" {
+		descriptionParts = append(descriptionParts, fmt.Sprintf("\n**⭐ 特におすすめ**\n%s", summary.MustRead))
+	}
+
+	// 各記事の推奨理由
+	if len(summary.Recommendations) > 0 {
+		descriptionParts = append(descriptionParts, "\n**📚 記事ガイド**")
+		for i, rec := range summary.Recommendations {
+			// 番号付きで推奨理由を表示
+			descriptionParts = append(descriptionParts, fmt.Sprintf("%d. %s", i+1, rec))
+		}
+	}
+
+	description := strings.Join(descriptionParts, "\n")
+	description = truncateString(description, maxDescriptionLength)
+
+	return EmbedObject{
+		Title:       fmt.Sprintf("📊 本日の厳選記事 (%d件)", articleCount),
+		Description: description,
+		Color:       0x3498db, // 青色（#3498db = 3447003）
 	}
 }
 
