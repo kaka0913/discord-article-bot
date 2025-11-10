@@ -115,3 +115,9 @@ func ValidateArticleEvaluation(eval *ArticleEvaluation) error {
 
 	return nil
 }
+
+// ValidateConfig は設定の妥当性を検証します（パッケージレベルの便利関数）
+func ValidateConfig(config *Config) error {
+	validator := NewValidator()
+	return validator.Validate(config)
+}
