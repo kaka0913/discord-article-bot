@@ -50,3 +50,4 @@ Thumbs.db
 # テスト用一時ファイル
 /tmp/
 /temp/
+.serena/
