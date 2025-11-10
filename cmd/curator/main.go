@@ -365,18 +365,56 @@ func orchestrateCuration(
 		}
 	}
 
-	// 6. Discordに通知
+	// 6. 記事全体のサマリーを生成
+	logger.Info("記事全体のサマリーを生成中", "articleCount", len(evaluatedArticles))
+
+	// LLM用の記事情報を準備
+	llmArticles := make([]llm.ArticleForSummary, len(evaluatedArticles))
+	for i, eval := range evaluatedArticles {
+		article, ok := articlesByURL[eval.ArticleURL]
+		title := "Unknown"
+		if ok {
+			title = article.Title
+		}
+		llmArticles[i] = llm.ArticleForSummary{
+			Title:          title,
+			Summary:        eval.Summary,
+			RelevanceScore: eval.RelevanceScore,
+			MatchingTopics: eval.MatchingTopics,
+		}
+	}
+
+	// サマリーを生成
+	summaryResult, err := llmEvaluator.GenerateArticlesSummary(ctx, llmArticles)
+	if err != nil {
+		logger.Warn("サマリー生成に失敗しました。サマリーなしで通知します", "error", err)
+		summaryResult = nil
+	} else {
+		logger.Info("サマリー生成に成功しました")
+	}
+
+	// Discord用のサマリーに変換
+	var discordSummary *discord.ArticlesSummary
+	if summaryResult != nil {
+		discordSummary = &discord.ArticlesSummary{
+			OverallSummary:  summaryResult.OverallSummary,
+			MustRead:        summaryResult.MustRead,
+			Recommendations: summaryResult.Recommendations,
+		}
+	}
+
+	// 7. Discordに通知
 	logger.Info("Discordに通知中", "articleCount", len(discordArticles))
 
 	date := time.Now().Format("2006-01-02")
-	messageID, err := discordClient.PostArticles(ctx, discordArticles, date)
+	messageID, err := discordClient.PostArticles(ctx, discordArticles, date, discordSummary)
 	if err != nil {
 		return fmt.Errorf("Discord通知に失敗: %w", err)
 	}
 
 	logger.Info("Discordへの通知に成功しました", "messageID", messageID)
 
-	// 7. 通知済み記事をFirestoreに保存
+	// 8. 通知済み記事をFirestoreに保存
 	logger.Info("通知済み記事をFirestoreに保存中")
 	for _, eval := range evaluatedArticles {
 		// マップから記事タイトルを取得（O(1)検索）

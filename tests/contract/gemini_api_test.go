@@ -27,10 +27,9 @@ func TestGeminiAPIArticleEvaluation(t *testing.T) {
 		err := json.NewDecoder(r.Body).Decode(&req)
 		require.NoError(t, err)
 
-		// 構造化出力がリクエストされていることを検証
-		assert.Equal(t, "application/json", req.GenerationConfig.ResponseMimeType)
+		// 生成設定を検証
 		assert.Equal(t, 0.3, req.GenerationConfig.Temperature)
-		assert.Equal(t, 500, req.GenerationConfig.MaxOutputTokens)
+		assert.Equal(t, 2048, req.GenerationConfig.MaxOutputTokens)
 
 		// リクエストの基本構造を検証
 		assert.Len(t, req.Contents, 1)

@@ -55,6 +55,17 @@ func buildSummaryPrompt(articles []ArticleForSummary) string {
 	// 記事情報をJSON形式で整形
 	articlesJSON, _ := json.MarshalIndent(articles, "", "  ")
 
+	// recommendations配列の例を動的に生成
+	recommendationExamples := ""
+	for i := 1; i <= len(articles); i++ {
+		if i > 1 {
+			recommendationExamples += ",\n    "
+		} else {
+			recommendationExamples += "\n    "
+		}
+		recommendationExamples += fmt.Sprintf("\"<記事%dのタイトルと推奨理由を1文で>\"", i)
+	}
+
 	return fmt.Sprintf(`あなたは技術記事のキュレーターです。以下の厳選された記事について、読者に向けた魅力的なサマリーを作成してください。
 
 記事リスト:
@@ -64,19 +75,17 @@ func buildSummaryPrompt(articles []ArticleForSummary) string {
 {
   "overall_summary": "<全体的なテーマや傾向を1-2文で説明>",
   "must_read": "<最もスコアが高い記事について、なぜ特に読むべきかを1文で説明>",
-  "recommendations": [
-    "<記事1のタイトルと推奨理由を1文で>",
-    "<記事2のタイトルと推奨理由を1文で>",
-    "<記事3のタイトルと推奨理由を1文で>"
+  "recommendations": [%s
   ]
 }
 
 作成ガイドライン:
-- overall_summary: 3記事全体を俯瞰して、共通テーマや今回の特徴を簡潔に説明
+- overall_summary: 全記事を俯瞰して、共通テーマや今回の特徴を簡潔に説明
 - must_read: 最高スコアの記事について「なぜ特に読むべきか」を強調
 - recommendations: 各記事について「○○な人におすすめ」「○○を学べる」など具体的な推奨理由
 - 簡潔で読みやすく、技術者の興味を引く表現を使う
 - スコアの数値は直接的に言及せず、「特におすすめ」「実践的」などの表現を使う
+- recommendations配列には必ず%d個の要素を含めること（記事数と一致）
 
-重要: 必ずJSON形式で応答してください。マークダウンコードブロックは使用しても構いません。`, string(articlesJSON))
+重要: 必ずJSON形式で応答してください。マークダウンコードブロックは使用しても構いません。`, string(articlesJSON), recommendationExamples, len(articles))
 }

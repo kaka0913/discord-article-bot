@@ -101,7 +101,7 @@ func TestDiscordWebhookValidPayload(t *testing.T) {
 		},
 	}
 
-	messageID, err := client.PostArticles(context.Background(), articles, "2025-10-27")
+	messageID, err := client.PostArticles(context.Background(), articles, "2025-10-27", nil)
 	if err != nil {
 		t.Fatalf("Failed to post articles: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestDiscordWebhookMaxEmbeds(t *testing.T) {
 		}
 	}
 
-	_, err := client.PostArticles(context.Background(), articles, "2025-10-27")
+	_, err := client.PostArticles(context.Background(), articles, "2025-10-27", nil)
 	if err != nil {
 		t.Fatalf("Failed to post 10 embeds: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestDiscordWebhookTitleTooLong(t *testing.T) {
 	}
 
 	// フォーマッターが自動的に切り詰めるので、エラーにならないはず
-	_, err := client.PostArticles(context.Background(), articles, "2025-10-27")
+	_, err := client.PostArticles(context.Background(), articles, "2025-10-27", nil)
 	if err != nil {
 		t.Fatalf("Expected success with truncated title, got error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestDiscordWebhookDescriptionTooLong(t *testing.T) {
 	}
 
 	// フォーマッターが自動的に切り詰めるので、エラーにならないはず
-	_, err := client.PostArticles(context.Background(), articles, "2025-10-27")
+	_, err := client.PostArticles(context.Background(), articles, "2025-10-27", nil)
 	if err != nil {
 		t.Fatalf("Expected success with truncated description, got error: %v", err)
 	}
@@ -280,7 +280,7 @@ func TestDiscordWebhookInvalidWebhook(t *testing.T) {
 		},
 	}
 
-	_, err := client.PostArticles(context.Background(), articles, "2025-10-27")
+	_, err := client.PostArticles(context.Background(), articles, "2025-10-27", nil)
 	if err == nil {
 		t.Fatal("Expected error for invalid webhook, got nil")
 	}
@@ -329,7 +329,7 @@ func TestDiscordWebhookRateLimit(t *testing.T) {
 	}
 
 	// レート制限後に再試行して成功することを確認
-	messageID, err := client.PostArticles(context.Background(), articles, "2025-10-27")
+	messageID, err := client.PostArticles(context.Background(), articles, "2025-10-27", nil)
 	if err != nil {
 		t.Fatalf("Expected success after retry, got error: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestDiscordWebhookTooManyEmbeds(t *testing.T) {
 		}
 	}
 
-	_, err := client.PostArticles(context.Background(), articles, "2025-10-27")
+	_, err := client.PostArticles(context.Background(), articles, "2025-10-27", nil)
 	if err == nil {
 		t.Fatal("Expected error for too many embeds, got nil")
 	}
