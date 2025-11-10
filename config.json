@@ -47,5 +47,11 @@
     "max_articles": 5,
     "min_articles": 1,
     "min_relevance_score": 70
+  },
+  "timeout_settings": {
+    "rss_fetch_timeout_seconds": 10,
+    "article_fetch_timeout_seconds": 10,
+    "min_text_length": 100,
+    "max_text_length": 50000
   }
 }

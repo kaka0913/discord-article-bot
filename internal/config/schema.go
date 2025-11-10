@@ -38,11 +38,20 @@ type NotificationSettings struct {
 	MinRelevanceScore int `json:"min_relevance_score" validate:"required,min=0,max=100"`
 }
 
+// TimeoutSettings はタイムアウトとテキスト長に関する設定を表します
+type TimeoutSettings struct {
+	RSSFetchTimeoutSeconds     int `json:"rss_fetch_timeout_seconds" validate:"required,min=1,max=60"`
+	ArticleFetchTimeoutSeconds int `json:"article_fetch_timeout_seconds" validate:"required,min=1,max=60"`
+	MinTextLength              int `json:"min_text_length" validate:"required,min=10,max=10000"`
+	MaxTextLength              int `json:"max_text_length" validate:"required,min=1000,max=100000"`
+}
+
 // Config はアプリケーション全体の設定を表します
 type Config struct {
 	RSSSources           []RSSSource          `json:"rss_sources" validate:"required,min=1,max=10,dive"`
 	Interests            []InterestTopic      `json:"interests" validate:"required,min=1,max=50,dive"`
 	NotificationSettings NotificationSettings `json:"notification_settings" validate:"required"`
+	TimeoutSettings      TimeoutSettings      `json:"timeout_settings" validate:"required"`
 }
 
 // GetEnabledSources は有効なRSSソースのみを返します

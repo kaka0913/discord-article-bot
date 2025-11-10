@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 
@@ -34,7 +35,9 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	log.Fatal(fmt.Sprintf("Cloud Functions framework not running on port %s", port))
+	if err := funcframework.Start(port); err != nil {
+		log.Fatalf("funcframework.Start: %v\n", err)
+	}
 }
 
 // curateArticles はPub/Subトリガーによって実行されるメイン処理
@@ -100,11 +103,11 @@ func curateArticles(ctx context.Context, e event.Event) error {
 		"maxArticles", cfg.NotificationSettings.MaxArticles,
 	)
 
-	// 依存関係を初期化
-	rssFetcher := rss.NewFetcher(10 * time.Second)
+	// 依存関係を初期化（設定値から取得）
+	rssFetcher := rss.NewFetcher(time.Duration(cfg.TimeoutSettings.RSSFetchTimeoutSeconds) * time.Second)
 	rssParser := rss.NewParser()
-	articleFetcher := article.NewFetcher(10 * time.Second)
-	articleExtractor := article.NewExtractor(100, 50000)
+	articleFetcher := article.NewFetcher(time.Duration(cfg.TimeoutSettings.ArticleFetchTimeoutSeconds) * time.Second)
+	articleExtractor := article.NewExtractor(cfg.TimeoutSettings.MinTextLength, cfg.TimeoutSettings.MaxTextLength)
 	llmClient := llm.NewClient(geminiAPIKey)
 	llmEvaluator := llm.NewEvaluator(llmClient)
 	discordClient := discord.NewClient(discordWebhookURL, logger)
@@ -180,34 +183,55 @@ func orchestrateCuration(
 	// 2. 重複チェック（通知済み・却下済み記事を除外）
 	logger.Info("重複チェックを実行中")
 	filteredArticles := []rss.Article{}
+	var firestoreErrorCount int
+	var notifiedSkipCount, rejectedSkipCount int
+	const maxFirestoreErrors = 10
 
 	for _, article := range allArticles {
 		// 通知済みチェック
 		notified, err := firestoreClient.IsArticleNotified(ctx, article.URL)
 		if err != nil {
+			firestoreErrorCount++
 			logger.Error("通知済みチェックに失敗しました", "url", article.URL, "error", err)
+			if firestoreErrorCount >= maxFirestoreErrors {
+				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
+			}
+			// エラー時は安全側に倒して処理を続行（重複のリスクはあるが、記事を見逃すよりまし）
+			filteredArticles = append(filteredArticles, article)
 			continue
 		}
 		if notified {
-			logger.Debug("通知済み記事をスキップ", "url", article.URL)
+			notifiedSkipCount++
 			continue
 		}
 
 		// 却下済みチェック
 		rejected, err := firestoreClient.IsArticleRejected(ctx, article.URL)
 		if err != nil {
+			firestoreErrorCount++
 			logger.Error("却下済みチェックに失敗しました", "url", article.URL, "error", err)
+			if firestoreErrorCount >= maxFirestoreErrors {
+				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
+			}
+			// エラー時は安全側に倒して処理を続行
+			filteredArticles = append(filteredArticles, article)
 			continue
 		}
 		if rejected {
-			logger.Debug("却下済み記事をスキップ", "url", article.URL)
+			rejectedSkipCount++
 			continue
 		}
 
 		filteredArticles = append(filteredArticles, article)
 	}
 
-	logger.Info("重複チェック完了", "originalCount", len(allArticles), "filteredCount", len(filteredArticles))
+	logger.Info("重複チェック完了",
+		"originalCount", len(allArticles),
+		"filteredCount", len(filteredArticles),
+		"notifiedSkipped", notifiedSkipCount,
+		"rejectedSkipped", rejectedSkipCount,
+		"firestoreErrors", firestoreErrorCount,
+	)
 
 	if len(filteredArticles) == 0 {
 		logger.Info("新しい記事が見つかりませんでした")
@@ -314,24 +338,25 @@ func orchestrateCuration(
 	logger.Info("上位記事を選択しました", "count", len(evaluatedArticles))
 
 	// 5. Discord通知用のペイロードを作成
+	// パフォーマンス最適化: 記事URLからの高速検索用マップを作成（O(n²) → O(n)）
+	articlesByURL := make(map[string]rss.Article, len(filteredArticles))
+	for _, article := range filteredArticles {
+		articlesByURL[article.URL] = article
+	}
+
 	discordArticles := make([]discord.Article, len(evaluatedArticles))
 	for i, eval := range evaluatedArticles {
-		// 元の記事を検索（URLでマッチ）
-		var sourceArticle *rss.Article
-		for _, article := range filteredArticles {
-			if article.URL == eval.ArticleURL {
-				sourceArticle = &article
-				break
-			}
-		}
-
+		// マップから記事を取得（O(1)検索）
+		article, ok := articlesByURL[eval.ArticleURL]
+		title := "Unknown"
 		sourceFeed := "Unknown"
-		if sourceArticle != nil {
-			sourceFeed = sourceArticle.SourceFeed
+		if ok {
+			title = article.Title
+			sourceFeed = article.SourceFeed
 		}
 
 		discordArticles[i] = discord.Article{
-			Title:       findArticleTitle(eval.ArticleURL, filteredArticles),
+			Title:       title,
 			Description: eval.Summary,
 			URL:         eval.ArticleURL,
 			Relevance:   eval.RelevanceScore,
@@ -354,7 +379,12 @@ func orchestrateCuration(
 	// 7. 通知済み記事をFirestoreに保存
 	logger.Info("通知済み記事をFirestoreに保存中")
 	for _, eval := range evaluatedArticles {
-		title := findArticleTitle(eval.ArticleURL, filteredArticles)
+		// マップから記事タイトルを取得（O(1)検索）
+		article, ok := articlesByURL[eval.ArticleURL]
+		title := "Unknown"
+		if ok {
+			title = article.Title
+		}
 		if err := firestoreClient.SaveNotifiedArticle(ctx, eval.ArticleURL, messageID, title, eval.RelevanceScore); err != nil {
 			logger.Error("通知済み記事の保存に失敗", "url", eval.ArticleURL, "error", err)
 			// エラーをログに記録するが、処理は続行
@@ -363,14 +393,4 @@ func orchestrateCuration(
 
 	logger.Info("通知済み記事の保存完了")
 	return nil
-}
-
-// findArticleTitle は記事URLから元のタイトルを検索します
-func findArticleTitle(url string, articles []rss.Article) string {
-	for _, article := range articles {
-		if article.URL == url {
-			return article.Title
-		}
-	}
-	return "Unknown"
 }
