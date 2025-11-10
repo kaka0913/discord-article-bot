@@ -229,7 +229,15 @@ func orchestrateCuration(
 		interestTopics[i] = interest.Topic
 	}
 
-	for _, rssArticle := range filteredArticles {
+	// ローカルテスト: 無料版API制限を考慮して3記事に制限
+	maxTestArticles := 3
+	testArticles := filteredArticles
+	if len(testArticles) > maxTestArticles {
+		testArticles = testArticles[:maxTestArticles]
+		logger.Info("ローカルテスト: API制限のため評価記事数を制限", "limit", maxTestArticles)
+	}
+
+	for _, rssArticle := range testArticles {
 		// 記事HTMLを取得
 		htmlContent, err := articleFetcher.Fetch(ctx, rssArticle.URL)
 		if err != nil {

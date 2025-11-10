@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kaka0913/discord-article-bot/internal/config"
@@ -48,6 +49,9 @@ func (e *Evaluator) EvaluateArticle(
 
 	// 応答からJSONテキストを抽出
 	jsonText := response.Candidates[0].Content.Parts[0].Text
+
+	// マークダウンコードブロックを除去（Gemini 2.0対応）
+	jsonText = extractJSONFromMarkdown(jsonText)
 
 	// JSONをパース
 	var result EvaluationResult
@@ -178,4 +182,29 @@ func DetermineRejectionReason(result *EvaluationResult) string {
 
 	// 低関連性
 	return config.ReasonLowRelevance
+}
+
+// extractJSONFromMarkdown はマークダウンコードブロックからJSONを抽出します
+// Gemini 2.0は ```json ... ``` の形式でJSONを返すことがあるため、これを除去します
+func extractJSONFromMarkdown(text string) string {
+	text = strings.TrimSpace(text)
+
+	// ```json で始まり ``` で終わる場合
+	if strings.HasPrefix(text, "```json") && strings.HasSuffix(text, "```") {
+		text = strings.TrimPrefix(text, "```json")
+		text = strings.TrimSuffix(text, "```")
+		text = strings.TrimSpace(text)
+		return text
+	}
+
+	// ``` で始まり ``` で終わる場合（言語指定なし）
+	if strings.HasPrefix(text, "```") && strings.HasSuffix(text, "```") {
+		text = strings.TrimPrefix(text, "```")
+		text = strings.TrimSuffix(text, "```")
+		text = strings.TrimSpace(text)
+		return text
+	}
+
+	// マークダウンコードブロックがない場合はそのまま返す
+	return text
 }

@@ -14,20 +14,20 @@ import (
 )
 
 const (
-	// GeminiAPIURL はGemini Flash APIのエンドポイント
-	GeminiAPIURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+	// GeminiAPIURL はGemini 2.0 Flash APIのエンドポイント（AI Studio無料版）
+	GeminiAPIURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 	// Temperature はGemini APIの温度パラメータ（一貫性のために低く設定）
 	Temperature = 0.3
 
-	// MaxOutputTokens は応答の最大トークン数
-	MaxOutputTokens = 500
+	// MaxOutputTokens は応答の最大トークン数（AI Studio無料版対応）
+	MaxOutputTokens = 2048
 
-	// RequestInterval は1リクエストあたりの平均間隔（4秒 = 15 RPM）
-	RequestInterval = 4 * time.Second
+	// RequestInterval は1リクエストあたりの平均間隔（AI Studio無料版: 6秒 = 10 RPM）
+	RequestInterval = 6 * time.Second
 
-	// BurstLimit はレート制限のバースト許容数（短期的なスパイクに対応）
-	BurstLimit = 3
+	// BurstLimit はレート制限のバースト許容数（AI Studio無料版対応）
+	BurstLimit = 2
 )
 
 // Client はGemini APIクライアントを表します
@@ -39,7 +39,7 @@ type Client struct {
 
 // NewClient は新しいGemini APIクライアントを作成します
 func NewClient(apiKey string) *Client {
-	// 15 RPM = 4秒に1リクエスト、バースト3を許可（短期的なスパイクに対応）
+	// AI Studio無料版: 10 RPM = 6秒に1リクエスト、バースト2を許可
 	limiter := rate.NewLimiter(rate.Every(RequestInterval), BurstLimit)
 
 	return &Client{
@@ -68,9 +68,8 @@ type Part struct {
 
 // GenerationConfig は生成設定を表します
 type GenerationConfig struct {
-	Temperature      float64 `json:"temperature"`
-	MaxOutputTokens  int     `json:"maxOutputTokens"`
-	ResponseMimeType string  `json:"responseMimeType"`
+	Temperature     float64 `json:"temperature"`
+	MaxOutputTokens int     `json:"maxOutputTokens"`
 }
 
 // GeminiResponse はGemini APIからの応答を表します
@@ -129,9 +128,8 @@ func (c *Client) GenerateContent(ctx context.Context, prompt string) (*GeminiRes
 			},
 		},
 		GenerationConfig: GenerationConfig{
-			Temperature:      Temperature,
-			MaxOutputTokens:  MaxOutputTokens,
-			ResponseMimeType: "application/json",
+			Temperature:     Temperature,
+			MaxOutputTokens: MaxOutputTokens,
 		},
 	}
 

@@ -183,6 +183,12 @@ func (c *Client) post(ctx context.Context, payload WebhookPayload) (string, erro
 		return "", c.handleErrorResponse(resp.StatusCode, body)
 	}
 
+	// 204 No Contentの場合はbodyが空なのでダミーIDを返す
+	if resp.StatusCode == http.StatusNoContent || len(body) == 0 {
+		c.logger.Info("Discordへのメッセージ送信に成功しました (No Content)")
+		return "success-no-content", nil
+	}
+
 	// 成功レスポンスをパース
 	var webhookResp WebhookResponse
 	if err := json.Unmarshal(body, &webhookResp); err != nil {
