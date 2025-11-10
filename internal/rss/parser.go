@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mmcdole/gofeed"
 
@@ -77,7 +78,7 @@ func (p *Parser) Parse(ctx context.Context, xmlData []byte, sourceFeedName strin
 		// タイトルをサニタイズ（前後の空白を削除）
 		title := strings.TrimSpace(item.Title)
 		if len(title) > maxTitleLength {
-			title = title[:maxTitleLength]
+			title = truncateUTF8(title, maxTitleLength)
 		}
 
 		// 公開日時を取得（存在しない場合は現在時刻を使用）
@@ -106,4 +107,22 @@ func (p *Parser) Parse(ctx context.Context, xmlData []byte, sourceFeedName strin
 	)
 
 	return articles, nil
+}
+
+// truncateUTF8 はUTF-8文字列を安全に切り詰める
+// マルチバイト文字の途中で切断されることを防ぐ
+func truncateUTF8(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+
+	// maxBytes以下で最大のUTF-8安全な位置を見つける
+	for i := maxBytes; i > 0; i-- {
+		if utf8.RuneStart(s[i]) {
+			return s[:i]
+		}
+	}
+
+	// 最初の1文字も切り詰められない場合は空文字列を返す
+	return ""
 }
