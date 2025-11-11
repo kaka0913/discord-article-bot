@@ -13,8 +13,6 @@ variable "config_url" {
   type        = string
 }
 
-# HTTPトリガーに変更したため、pubsub_topic_idは不要
-
 variable "source_archive_object" {
   description = "Cloud Storageに配置されたソースコードアーカイブのオブジェクト名"
   type        = string
