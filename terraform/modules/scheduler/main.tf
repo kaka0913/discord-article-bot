@@ -13,12 +13,12 @@ resource "google_pubsub_topic" "curator_trigger" {
   }
 }
 
-# Cloud Scheduler ジョブ（毎日8:00 JSTに実行）
+# Cloud Scheduler ジョブ（毎日9:00 JSTに実行）
 resource "google_cloud_scheduler_job" "daily_curator" {
   project          = var.project_id
   name             = "daily-rss-curator"
-  description      = "RSS記事キュレーションを毎日8:00 JSTに実行"
-  schedule         = "0 8 * * *"
+  description      = "RSS記事キュレーションを毎日9:00 JSTに実行"
+  schedule         = "0 9 * * *"
   time_zone        = "Asia/Tokyo"
   attempt_deadline = "320s"
 
