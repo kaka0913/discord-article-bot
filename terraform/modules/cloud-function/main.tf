@@ -66,9 +66,6 @@ resource "google_cloudfunctions2_function" "curator" {
     }
   }
 
-  # HTTPトリガー（イベントトリガーは540秒制限があるため）
-  # event_trigger は使用せず、HTTPエンドポイントとして公開
-
   labels = {
     app         = "rss-article-curator"
     environment = "prod"
