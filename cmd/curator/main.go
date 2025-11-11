@@ -41,10 +41,12 @@ func main() {
 }
 
 // handleError はエラーをログに記録し、HTTPエラーレスポンスを返す
-func handleError(w http.ResponseWriter, logger *logging.Logger, statusCode int, message string, err error) {
+// セキュリティ上の理由から、エラーの詳細はログにのみ記録し、HTTPレスポンスには含めない
+func handleError(w http.ResponseWriter, logger logging.Logger, statusCode int, message string, err error) {
 	if err != nil {
 		logger.Error(message, "error", err)
-		http.Error(w, fmt.Sprintf("%s: %v", message, err), statusCode)
+		// 本番環境では詳細なエラーメッセージを返さない
+		http.Error(w, message, statusCode)
 	} else {
 		logger.Error(message)
 		http.Error(w, message, statusCode)
@@ -123,7 +125,8 @@ func curatorHandler(w http.ResponseWriter, r *http.Request) {
 	llmEvaluator := llm.NewEvaluator(llmClient)
 	discordClient := discord.NewClient(discordWebhookURL, logger)
 
-	if err := orchestrateCuration(
+	orchestrateCuration(
+		w,
 		ctx,
 		cfg,
 		rssFetcher,
@@ -135,13 +138,7 @@ func curatorHandler(w http.ResponseWriter, r *http.Request) {
 		firestoreClient,
 		logger,
 		0, // 本番環境では記事数制限なし
-	); err != nil {
-		logger.Error("記事キュレーション処理に失敗しました", "error", err)
-		return err
-	}
-
-	logger.Info("記事キュレーション処理が正常に完了しました")
-	return nil
+	)
 }
 
 func getArticleTitle(articlesByURL map[string]rss.Article, articleURL string) string {
@@ -152,6 +149,7 @@ func getArticleTitle(articlesByURL map[string]rss.Article, articleURL string) st
 }
 
 func orchestrateCuration(
+	w http.ResponseWriter,
 	ctx context.Context,
 	cfg *config.Config,
 	rssFetcher *rss.Fetcher,
@@ -163,7 +161,7 @@ func orchestrateCuration(
 	firestoreClient *storage.Client,
 	logger logging.Logger,
 	maxEvaluationArticles int, // 評価する記事の最大数（0=無制限、ローカルテストでは3）
-) error {
+) {
 	logger.Info("RSSフィードから記事を取得中")
 	allArticles := []rss.Article{}
 
@@ -189,7 +187,9 @@ func orchestrateCuration(
 
 	if len(allArticles) == 0 {
 		logger.Warn("処理可能な記事が見つかりませんでした")
-		return nil
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "処理可能な記事が見つかりませんでした\n")
+		return
 	}
 
 	logger.Info("すべてのRSSフィードから記事を取得しました", "totalCount", len(allArticles))
@@ -206,6 +206,10 @@ func orchestrateCuration(
 			firestoreErrorCount++
 			logger.Error("通知済みチェックに失敗しました", "url", article.URL, "error", err)
 			if firestoreErrorCount >= maxFirestoreErrors {
+				logger.Error("Firestoreエラーが多すぎます。処理を中止します",
+					"firestoreErrorCount", firestoreErrorCount,
+					"processedArticles", len(allArticles),
+					"filteredArticles", len(filteredArticles))
 				handleError(w, logger, http.StatusInternalServerError, fmt.Sprintf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount), nil)
 				return
 			}
@@ -423,5 +427,5 @@ func orchestrateCuration(
 
 	// HTTPレスポンスを返す
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "記事キュレーション処理が完了しました。%d件の記事を通知しました。\n", len(evaluatedArticles))
+	fmt.Fprintf(w, "記事キュレーション処理が完了しました。%d件の記事を通知しました。\n", len(discordArticles))
 }
