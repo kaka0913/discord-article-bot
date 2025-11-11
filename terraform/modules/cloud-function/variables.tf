@@ -13,10 +13,7 @@ variable "config_url" {
   type        = string
 }
 
-variable "pubsub_topic_id" {
-  description = "トリガー用のPub/SubトピックID（完全修飾名）"
-  type        = string
-}
+# HTTPトリガーに変更したため、pubsub_topic_idは不要
 
 variable "source_archive_object" {
   description = "Cloud Storageに配置されたソースコードアーカイブのオブジェクト名"

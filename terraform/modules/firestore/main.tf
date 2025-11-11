@@ -12,38 +12,6 @@ resource "google_firestore_database" "database" {
   deletion_policy = "ABANDON"
 }
 
-# notified_articles コレクション用のインデックス
-# notified_at フィールドでのソート・クエリ用
-resource "google_firestore_index" "notified_articles_timestamp" {
-  project    = var.project_id
-  database   = google_firestore_database.database.name
-  collection = "notified_articles"
-
-  fields {
-    field_path = "notified_at"
-    order      = "DESCENDING"
-  }
-
-  fields {
-    field_path = "__name__"
-    order      = "DESCENDING"
-  }
-}
-
-# rejected_articles コレクション用のインデックス
-# evaluated_at フィールドでのソート・クエリ用（TTL削除クエリ用）
-resource "google_firestore_index" "rejected_articles_timestamp" {
-  project    = var.project_id
-  database   = google_firestore_database.database.name
-  collection = "rejected_articles"
-
-  fields {
-    field_path = "evaluated_at"
-    order      = "DESCENDING"
-  }
-
-  fields {
-    field_path = "__name__"
-    order      = "DESCENDING"
-  }
-}
+# 単一フィールドインデックスは自動的に作成されるため、
+# 明示的なインデックス定義は不要です
+# 複合インデックスが必要になった場合のみ、ここに追加してください

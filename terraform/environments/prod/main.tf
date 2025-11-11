@@ -70,29 +70,29 @@ module "firestore" {
   depends_on = [google_project_service.firestore]
 }
 
-# Cloud Schedulerモジュール（Pub/Subトピック作成 - Cloud Functionより先に必要）
-module "scheduler" {
-  source = "../../modules/scheduler"
-
-  project_id = var.project_id
-  region     = var.region
-
-  depends_on = [google_project_service.scheduler, google_project_service.pubsub]
-}
-
-# Cloud Functionモジュール（先にデプロイしてservice_account_emailを取得）
+# Cloud Functionモジュール（先にデプロイしてURLとservice_account_emailを取得）
 module "cloud_function" {
   source                = "../../modules/cloud-function"
   project_id            = var.project_id
   region                = var.region
   config_url            = var.config_url
-  pubsub_topic_id       = module.scheduler.pubsub_topic_id
   source_archive_object = var.source_archive_object
   depends_on = [
     google_project_service.cloudfunctions,
-    google_project_service.cloudbuild,
-    google_project_service.pubsub
+    google_project_service.cloudbuild
   ]
+}
+
+# Cloud Schedulerモジュール（Cloud Function作成後に設定）
+module "scheduler" {
+  source = "../../modules/scheduler"
+
+  project_id                        = var.project_id
+  region                            = var.region
+  function_url                      = module.cloud_function.function_url
+  scheduler_service_account_email   = module.cloud_function.service_account_email
+
+  depends_on = [google_project_service.scheduler, module.cloud_function]
 }
 
 # Secret Managerモジュール

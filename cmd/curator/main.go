@@ -5,13 +5,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"sort"
 	"time"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
-	"github.com/cloudevents/sdk-go/v2/event"
 
 	"github.com/kaka0913/discord-article-bot/internal/article"
 	"github.com/kaka0913/discord-article-bot/internal/config"
@@ -24,8 +24,8 @@ import (
 )
 
 func init() {
-	// Cloud Functionsイベントハンドラーを登録
-	functions.CloudEvent("CurateArticles", curateArticles)
+	// Cloud Functions HTTPハンドラーを登録
+	functions.HTTP("CuratorHandler", curatorHandler)
 }
 
 func main() {
@@ -40,8 +40,20 @@ func main() {
 	}
 }
 
-// curateArticles はPub/Subトリガーによって実行されるメイン処理
-func curateArticles(ctx context.Context, e event.Event) error {
+// handleError はエラーをログに記録し、HTTPエラーレスポンスを返す
+func handleError(w http.ResponseWriter, logger *logging.Logger, statusCode int, message string, err error) {
+	if err != nil {
+		logger.Error(message, "error", err)
+		http.Error(w, fmt.Sprintf("%s: %v", message, err), statusCode)
+	} else {
+		logger.Error(message)
+		http.Error(w, message, statusCode)
+	}
+}
+
+// curatorHandler はHTTPトリガーによって実行されるメイン処理
+func curatorHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	logger := logging.NewLogger()
 	ctx = logging.ToContext(ctx, logger)
 
@@ -49,7 +61,8 @@ func curateArticles(ctx context.Context, e event.Event) error {
 
 	projectID := os.Getenv("GCP_PROJECT_ID")
 	if projectID == "" {
-		return fmt.Errorf("GCP_PROJECT_ID環境変数が設定されていません")
+		handleError(w, logger, http.StatusInternalServerError, "GCP_PROJECT_ID環境変数が設定されていません", nil)
+		return
 	}
 
 	configSource := os.Getenv("CONFIG_SOURCE")
@@ -60,34 +73,40 @@ func curateArticles(ctx context.Context, e event.Event) error {
 
 	secretMgr, err := secrets.NewManager(ctx, projectID)
 	if err != nil {
-		return fmt.Errorf("Secret Managerクライアントの初期化に失敗: %w", err)
+		handleError(w, logger, http.StatusInternalServerError, "Secret Managerクライアントの初期化に失敗", err)
+		return
 	}
 	defer secretMgr.Close()
 
 	discordWebhookURL, err := secretMgr.GetSecret(ctx, "discord-webhook-url")
 	if err != nil {
-		return fmt.Errorf("Discord Webhook URLの取得に失敗: %w", err)
+		handleError(w, logger, http.StatusInternalServerError, "Discord Webhook URLの取得に失敗", err)
+		return
 	}
 
 	geminiAPIKey, err := secretMgr.GetSecret(ctx, "gemini-api-key")
 	if err != nil {
-		return fmt.Errorf("Gemini APIキーの取得に失敗: %w", err)
+		handleError(w, logger, http.StatusInternalServerError, "Gemini APIキーの取得に失敗", err)
+		return
 	}
 
 	firestoreClient, err := storage.NewClient(ctx, projectID)
 	if err != nil {
-		return fmt.Errorf("Firestoreクライアントの初期化に失敗: %w", err)
+		handleError(w, logger, http.StatusInternalServerError, "Firestoreクライアントの初期化に失敗", err)
+		return
 	}
 	defer firestoreClient.Close()
 
 	configLoader := config.NewLoader()
 	cfg, err := configLoader.Load(ctx, configSource)
 	if err != nil {
-		return fmt.Errorf("設定の読み込みに失敗: %w", err)
+		handleError(w, logger, http.StatusInternalServerError, "設定の読み込みに失敗", err)
+		return
 	}
 
 	if err := config.ValidateConfig(cfg); err != nil {
-		return fmt.Errorf("設定の検証に失敗: %w", err)
+		handleError(w, logger, http.StatusBadRequest, "設定の検証に失敗", err)
+		return
 	}
 
 	logger.Info("設定を読み込みました",
@@ -187,7 +206,8 @@ func orchestrateCuration(
 			firestoreErrorCount++
 			logger.Error("通知済みチェックに失敗しました", "url", article.URL, "error", err)
 			if firestoreErrorCount >= maxFirestoreErrors {
-				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
+				handleError(w, logger, http.StatusInternalServerError, fmt.Sprintf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount), nil)
+				return
 			}
 			filteredArticles = append(filteredArticles, article)
 			continue
@@ -202,7 +222,8 @@ func orchestrateCuration(
 			firestoreErrorCount++
 			logger.Error("却下済みチェックに失敗しました", "url", article.URL, "error", err)
 			if firestoreErrorCount >= maxFirestoreErrors {
-				return fmt.Errorf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount)
+				handleError(w, logger, http.StatusInternalServerError, fmt.Sprintf("Firestoreエラーが多すぎます（%d件）。処理を中止します", firestoreErrorCount), nil)
+				return
 			}
 			filteredArticles = append(filteredArticles, article)
 			continue
@@ -225,7 +246,9 @@ func orchestrateCuration(
 
 	if len(filteredArticles) == 0 {
 		logger.Info("新しい記事が見つかりませんでした")
-		return nil
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "新しい記事が見つかりませんでした\n")
+		return
 	}
 
 	if maxEvaluationArticles > 0 && len(filteredArticles) > maxEvaluationArticles {
@@ -309,7 +332,9 @@ func orchestrateCuration(
 
 	if len(evaluatedArticles) == 0 {
 		logger.Info("関連性のある記事が見つかりませんでした")
-		return nil
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "関連性のある記事が見つかりませんでした\n")
+		return
 	}
 
 	sort.Slice(evaluatedArticles, func(i, j int) bool {
@@ -380,7 +405,8 @@ func orchestrateCuration(
 	date := time.Now().Format("2006-01-02")
 	messageID, err := discordClient.PostArticles(ctx, discordArticles, date, discordSummary)
 	if err != nil {
-		return fmt.Errorf("Discord通知に失敗: %w", err)
+		handleError(w, logger, http.StatusInternalServerError, "Discord通知に失敗", err)
+		return
 	}
 
 	logger.Info("Discordへの通知に成功しました", "messageID", messageID)
@@ -394,5 +420,8 @@ func orchestrateCuration(
 	}
 
 	logger.Info("通知済み記事の保存完了")
-	return nil
+
+	// HTTPレスポンスを返す
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "記事キュレーション処理が完了しました。%d件の記事を通知しました。\n", len(evaluatedArticles))
 }

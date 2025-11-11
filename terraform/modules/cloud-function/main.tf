@@ -66,12 +66,8 @@ resource "google_cloudfunctions2_function" "curator" {
     }
   }
 
-  event_trigger {
-    trigger_region = var.region
-    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic   = var.pubsub_topic_id
-    retry_policy   = "RETRY_POLICY_RETRY"
-  }
+  # HTTPトリガー（イベントトリガーは540秒制限があるため）
+  # event_trigger は使用せず、HTTPエンドポイントとして公開
 
   labels = {
     app         = "rss-article-curator"
