@@ -77,20 +77,35 @@ jobs:
           echo "INTEREST_COUNT=$INTEREST_COUNT" >> $GITHUB_OUTPUT
 
       - name: Check config.json values
+        id: value_check
         run: |
+          WARNINGS=""
+
           # min_relevance_scoreの妥当性チェック
           MIN_SCORE=$(jq '.notification_settings.min_relevance_score' config.json)
           if [ "$MIN_SCORE" -lt 0 ] || [ "$MIN_SCORE" -gt 100 ]; then
-            echo "⚠️ Warning: min_relevance_score ($MIN_SCORE) should be between 0 and 100"
+            WARNING_MSG="min_relevance_score ($MIN_SCORE) should be between 0 and 100"
+            WARNINGS="${WARNINGS}- ${WARNING_MSG}\n"
+            echo "⚠️ Warning: ${WARNING_MSG}"
           fi
 
           # max_articlesの妥当性チェック
           MAX_ARTICLES=$(jq '.notification_settings.max_articles' config.json)
           if [ "$MAX_ARTICLES" -lt 1 ] || [ "$MAX_ARTICLES" -gt 10 ]; then
-            echo "⚠️ Warning: max_articles ($MAX_ARTICLES) should be between 1 and 10"
+            WARNING_MSG="max_articles ($MAX_ARTICLES) should be between 1 and 10"
+            WARNINGS="${WARNINGS}- ${WARNING_MSG}\n"
+            echo "⚠️ Warning: ${WARNING_MSG}"
           fi
 
-          echo "✅ Config values checked"
+          if [ -z "$WARNINGS" ]; then
+            echo "✅ Config values checked - all values are within valid ranges"
+            echo "HAS_WARNINGS=false" >> $GITHUB_OUTPUT
+          else
+            echo "HAS_WARNINGS=true" >> $GITHUB_OUTPUT
+            echo "WARNINGS<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$WARNINGS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
       - name: Comment PR with test results
         if: always()
@@ -102,6 +117,13 @@ jobs:
             const configValid = '${{ steps.config_validation.outputs.VALID }}' === 'true';
             const rssCount = '${{ steps.schema_validation.outputs.RSS_COUNT }}' || '0';
             const interestCount = '${{ steps.schema_validation.outputs.INTEREST_COUNT }}' || '0';
+            const hasWarnings = '${{ steps.value_check.outputs.HAS_WARNINGS }}' === 'true';
+            const warnings = `${{ steps.value_check.outputs.WARNINGS }}`;
+
+            let warningsSection = '';
+            if (hasWarnings) {
+              warningsSection = `\n### ⚠️ 設定値の警告\n${warnings}\n設定値は有効範囲外ですが、デプロイは可能です。必要に応じて修正してください。`;
+            }
 
             const body = `## テスト結果 🧪
 
@@ -113,6 +135,7 @@ jobs:
             ${configValid ? '✅ 設定ファイルは有効です' : '❌ 設定ファイルが無効です'}
             - RSSソース数: ${rssCount}
             - 興味トピック数: ${interestCount}
+            ${warningsSection}
 
             ### 次のステップ
             ${configValid ?
@@ -127,10 +150,16 @@ jobs:
               body: body
             });
 
-      - name: Upload coverage report
+      - name: Generate coverage HTML report
+        if: success()
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage reports
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage.out
+          path: |
+            coverage.out
+            coverage.html
           retention-days: 30
