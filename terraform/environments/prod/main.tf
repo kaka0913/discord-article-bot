@@ -70,29 +70,30 @@ module "firestore" {
   depends_on = [google_project_service.firestore]
 }
 
-# Cloud Schedulerモジュール（Pub/Subトピック作成 - Cloud Functionより先に必要）
+# Cloud Functionモジュール（gcloudでデプロイしたため、コメントアウト）
+# module "cloud_function" {
+#   source                = "../../modules/cloud-function"
+#   project_id            = var.project_id
+#   region                = var.region
+#   config_url            = var.config_url
+#   source_archive_object = var.source_archive_object
+#   depends_on = [
+#     google_project_service.cloudfunctions,
+#     google_project_service.cloudbuild
+#   ]
+# }
+
+# Cloud Schedulerモジュール（Cloud Function作成後に設定）
+# gcloudでデプロイしたCloud FunctionのURLとサービスアカウントを直接指定
 module "scheduler" {
   source = "../../modules/scheduler"
 
-  project_id = var.project_id
-  region     = var.region
+  project_id                        = var.project_id
+  region                            = var.region
+  function_url                      = "https://asia-northeast1-rss-article-curator-prod.cloudfunctions.net/rss-article-curator"
+  scheduler_service_account_email   = "rss-curator-function@rss-article-curator-prod.iam.gserviceaccount.com"
 
-  depends_on = [google_project_service.scheduler, google_project_service.pubsub]
-}
-
-# Cloud Functionモジュール（先にデプロイしてservice_account_emailを取得）
-module "cloud_function" {
-  source                = "../../modules/cloud-function"
-  project_id            = var.project_id
-  region                = var.region
-  config_url            = var.config_url
-  pubsub_topic_id       = module.scheduler.pubsub_topic_id
-  source_archive_object = var.source_archive_object
-  depends_on = [
-    google_project_service.cloudfunctions,
-    google_project_service.cloudbuild,
-    google_project_service.pubsub
-  ]
+  depends_on = [google_project_service.scheduler]
 }
 
 # Secret Managerモジュール
@@ -100,7 +101,7 @@ module "secrets" {
   source = "../../modules/secrets"
 
   project_id                     = var.project_id
-  cloud_function_service_account = module.cloud_function.service_account_email
+  cloud_function_service_account = "rss-curator-function@rss-article-curator-prod.iam.gserviceaccount.com"
 
   depends_on = [google_project_service.secretmanager]
 }

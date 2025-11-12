@@ -1,30 +1,23 @@
 # Cloud Scheduler モジュール
 # 毎日8:00 JSTにCloud FunctionsをトリガーするスケジューラとPub/Subトピックを管理
 
-# Pub/Subトピック（Cloud Schedulerからのメッセージ受信用）
-resource "google_pubsub_topic" "curator_trigger" {
-  project = var.project_id
-  name    = "rss-curator-trigger"
-
-  labels = {
-    app         = "rss-article-curator"
-    environment = "prod"
-    managed_by  = "terraform"
-  }
-}
-
-# Cloud Scheduler ジョブ（毎日8:00 JSTに実行）
+# Cloud Scheduler ジョブ（毎日9:00 JSTに実行）
+# HTTPトリガーに変更（イベントトリガーは540秒制限があるため）
 resource "google_cloud_scheduler_job" "daily_curator" {
   project          = var.project_id
   name             = "daily-rss-curator"
-  description      = "RSS記事キュレーションを毎日8:00 JSTに実行"
-  schedule         = "0 8 * * *"
+  description      = "RSS記事キュレーションを毎日9:00 JSTに実行"
+  schedule         = "0 9 * * *"
   time_zone        = "Asia/Tokyo"
-  attempt_deadline = "320s"
+  attempt_deadline = "1800s"  # Cloud Schedulerの最大値は30分（1800秒）
 
-  pubsub_target {
-    topic_name = google_pubsub_topic.curator_trigger.id
-    data       = base64encode("{\"trigger\":\"scheduled\"}")
+  http_target {
+    uri         = var.function_url
+    http_method = "POST"
+
+    oidc_token {
+      service_account_email = var.scheduler_service_account_email
+    }
   }
 
   retry_config {

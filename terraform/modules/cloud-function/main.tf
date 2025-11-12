@@ -55,7 +55,7 @@ resource "google_cloudfunctions2_function" "curator" {
     max_instance_count    = 1
     min_instance_count    = 0
     available_memory      = "512Mi"
-    timeout_seconds       = 300
+    timeout_seconds       = 3600
     service_account_email = google_service_account.curator_function.email
 
     environment_variables = {
@@ -64,13 +64,6 @@ resource "google_cloudfunctions2_function" "curator" {
       GEMINI_API_KEY_SECRET  = "gemini-api-key"
       DISCORD_WEBHOOK_SECRET = "discord-webhook-url"
     }
-  }
-
-  event_trigger {
-    trigger_region = var.region
-    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic   = var.pubsub_topic_id
-    retry_policy   = "RETRY_POLICY_RETRY"
   }
 
   labels = {
