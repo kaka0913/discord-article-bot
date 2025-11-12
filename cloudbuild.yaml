@@ -1,43 +1,84 @@
 # Cloud Build設定ファイル
-# GitHub Actions → Cloud Buildデプロイワークフロー用
+# GitHub Actions経由でトリガーされる想定
 
 steps:
-  # ステップ1: 依存関係のインストールとビルド
+  # ステップ1: 依存関係のインストール
   - name: 'gcr.io/cloud-builders/go'
     args: ['mod', 'download']
     env:
       - 'GO111MODULE=on'
+    id: 'download-deps'
 
   # ステップ2: テスト実行
   - name: 'gcr.io/cloud-builders/go'
     args: ['test', './...', '-v']
     env:
       - 'GO111MODULE=on'
+    id: 'run-tests'
+    waitFor: ['download-deps']
 
-  # ステップ3: Cloud Functionsデプロイ
+  # ステップ3: デプロイ用ディレクトリの準備
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        mkdir -p /workspace/deploy
+        cp cmd/curator/main.go /workspace/deploy/
+        cp -r internal /workspace/deploy/
+        cp go.mod /workspace/deploy/
+        cp go.sum /workspace/deploy/
+
+        # package mainをfunctionに変更
+        sed -i 's/package main/package function/g' /workspace/deploy/main.go
+
+        # main()関数を削除
+        sed -i '/^func main()/,/^}$$/d' /workspace/deploy/main.go
+
+        # importパスを修正
+        sed -i 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' /workspace/deploy/main.go
+
+        # go.modのmodule名を修正
+        sed -i 's|module github.com/kaka0913/discord-article-bot|module example.com/rss-curator-function|' /workspace/deploy/go.mod
+
+        # internal配下のimportパスも修正
+        find /workspace/deploy/internal -name "*.go" -type f -exec sed -i 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' {} \;
+    id: 'prepare-deploy'
+    waitFor: ['run-tests']
+
+  # ステップ4: Cloud Functionsデプロイ（HTTPトリガー）
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'functions'
       - 'deploy'
-      - 'rss-curator'
+      - '${_FUNCTION_NAME}'
       - '--gen2'
-      - '--runtime=go121'
+      - '--runtime=go122'
       - '--region=${_REGION}'
-      - '--source=.'
+      - '--source=/workspace/deploy'
       - '--entry-point=CuratorHandler'
-      - '--trigger-topic=${_PUBSUB_TOPIC}'
+      - '--trigger-http'
+      - '--no-allow-unauthenticated'
+      - '--service-account=${_SERVICE_ACCOUNT}'
+      - '--memory=512Mi'
       - '--timeout=3600s'
-      - '--memory=512MB'
       - '--max-instances=1'
-      - '--set-env-vars=GCP_PROJECT_ID=${PROJECT_ID}'
+      - '--min-instances=0'
+      - '--set-env-vars=CONFIG_URL=https://raw.githubusercontent.com/${_GITHUB_REPO}/main/config.json,GCP_PROJECT_ID=${PROJECT_ID},GEMINI_API_KEY_SECRET=gemini-api-key,DISCORD_WEBHOOK_SECRET=discord-webhook-url'
+      - '--project=${PROJECT_ID}'
+    id: 'deploy-function'
+    waitFor: ['prepare-deploy']
 
 # デフォルト値
 substitutions:
+  _FUNCTION_NAME: 'rss-article-curator'
   _REGION: 'asia-northeast1'
-  _PUBSUB_TOPIC: 'rss-curator-trigger'
+  _SERVICE_ACCOUNT: 'rss-curator-function@rss-article-curator-prod.iam.gserviceaccount.com'
+  _GITHUB_REPO: 'kaka0913/discord-article-bot'
 
 # タイムアウト設定
 timeout: '1200s'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'

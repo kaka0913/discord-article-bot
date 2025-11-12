@@ -1,0 +1,136 @@
+name: Test Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    name: Run Tests and Validations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        id: unit_tests
+        run: |
+          go test ./... -v -coverprofile=coverage.out
+          echo "COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')" >> $GITHUB_OUTPUT
+
+      - name: Validate config.json syntax
+        id: config_validation
+        run: |
+          if ! jq empty config.json 2>/dev/null; then
+            echo "❌ Invalid JSON syntax in config.json"
+            echo "VALID=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          echo "✅ config.json syntax is valid"
+          echo "VALID=true" >> $GITHUB_OUTPUT
+
+      - name: Validate config.json schema
+        id: schema_validation
+        run: |
+          # 必須フィールドの存在チェック
+          if ! jq -e '.rss_sources' config.json > /dev/null; then
+            echo "❌ Missing required field: rss_sources"
+            exit 1
+          fi
+          if ! jq -e '.interests' config.json > /dev/null; then
+            echo "❌ Missing required field: interests"
+            exit 1
+          fi
+          if ! jq -e '.notification_settings' config.json > /dev/null; then
+            echo "❌ Missing required field: notification_settings"
+            exit 1
+          fi
+
+          # 配列が空でないことを確認
+          RSS_COUNT=$(jq '.rss_sources | length' config.json)
+          INTEREST_COUNT=$(jq '.interests | length' config.json)
+
+          if [ "$RSS_COUNT" -eq 0 ]; then
+            echo "❌ rss_sources array is empty"
+            exit 1
+          fi
+
+          if [ "$INTEREST_COUNT" -eq 0 ]; then
+            echo "❌ interests array is empty"
+            exit 1
+          fi
+
+          echo "✅ config.json schema is valid"
+          echo "RSS_COUNT=$RSS_COUNT" >> $GITHUB_OUTPUT
+          echo "INTEREST_COUNT=$INTEREST_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Check config.json values
+        run: |
+          # min_relevance_scoreの妥当性チェック
+          MIN_SCORE=$(jq '.notification_settings.min_relevance_score' config.json)
+          if [ "$MIN_SCORE" -lt 0 ] || [ "$MIN_SCORE" -gt 100 ]; then
+            echo "⚠️ Warning: min_relevance_score ($MIN_SCORE) should be between 0 and 100"
+          fi
+
+          # max_articlesの妥当性チェック
+          MAX_ARTICLES=$(jq '.notification_settings.max_articles' config.json)
+          if [ "$MAX_ARTICLES" -lt 1 ] || [ "$MAX_ARTICLES" -gt 10 ]; then
+            echo "⚠️ Warning: max_articles ($MAX_ARTICLES) should be between 1 and 10"
+          fi
+
+          echo "✅ Config values checked"
+
+      - name: Comment PR with test results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const coverage = '${{ steps.unit_tests.outputs.COVERAGE }}' || 'N/A';
+            const configValid = '${{ steps.config_validation.outputs.VALID }}' === 'true';
+            const rssCount = '${{ steps.schema_validation.outputs.RSS_COUNT }}' || '0';
+            const interestCount = '${{ steps.schema_validation.outputs.INTEREST_COUNT }}' || '0';
+
+            const body = `## テスト結果 🧪
+
+            ### ユニットテスト
+            ${coverage !== 'N/A' ? '✅ すべてのテストが合格しました' : '❌ テストが失敗しました'}
+            - カバレッジ: ${coverage}
+
+            ### config.json検証
+            ${configValid ? '✅ 設定ファイルは有効です' : '❌ 設定ファイルが無効です'}
+            - RSSソース数: ${rssCount}
+            - 興味トピック数: ${interestCount}
+
+            ### 次のステップ
+            ${configValid ?
+              '✅ このPRをマージすると、mainブランチへのpush時に自動デプロイが実行されます。\n翌朝9:00 JSTから新しい設定で記事キュレーションが開始されます。' :
+              '❌ config.jsonを修正してから再度プッシュしてください。'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Upload coverage report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 30
