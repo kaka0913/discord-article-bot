@@ -67,7 +67,12 @@ func curatorHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	configSource := os.Getenv("CONFIG_SOURCE")
+	// CONFIG_URLまたはCONFIG_SOURCE環境変数から設定ソースを取得
+	// CONFIG_URLを優先（gcloudデプロイで使用）
+	configSource := os.Getenv("CONFIG_URL")
+	if configSource == "" {
+		configSource = os.Getenv("CONFIG_SOURCE")
+	}
 	if configSource == "" {
 		// デフォルトはローカルのconfig.json
 		configSource = "config.json"

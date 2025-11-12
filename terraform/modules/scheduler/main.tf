@@ -9,7 +9,7 @@ resource "google_cloud_scheduler_job" "daily_curator" {
   description      = "RSS記事キュレーションを毎日9:00 JSTに実行"
   schedule         = "0 9 * * *"
   time_zone        = "Asia/Tokyo"
-  attempt_deadline = "3600s"
+  attempt_deadline = "1800s"  # Cloud Schedulerの最大値は30分（1800秒）
 
   http_target {
     uri         = var.function_url
