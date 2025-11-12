@@ -31,13 +31,13 @@
 .
 ├── .github/
 │   ├── workflows/
-│   │   ├── deploy.yml          # 自動デプロイワークフロー（✅ 実装済み）
-│   │   └── test.yml            # PRテストワークフロー（✅ 実装済み）
-│   └── PULL_REQUEST_TEMPLATE.md # PRテンプレート（✅ 実装済み）
+│   │   ├── deploy.yml          # 自動デプロイワークフロー
+│   │   └── test.yml            # PRテストワークフロー
+│   └── PULL_REQUEST_TEMPLATE.md # PRテンプレート
 ├── cmd/
-│   ├── curator/                 # Cloud Functions本番環境用（✅ 実装済み）
-│   └── local-test/              # ローカルテスト用（✅ 実装済み）
-├── internal/                    # 内部パッケージ（✅ すべて実装済み）
+│   ├── curator/                 # Cloud Functions本番環境用
+│   └── local-test/              # ローカルテスト用
+├── internal/                    # 内部パッケージ
 │   ├── config/                 # 設定管理
 │   ├── secrets/                # Secret Manager統合
 │   ├── errors/                 # エラーハンドリング
@@ -47,9 +47,9 @@
 │   ├── article/                # 記事コンテンツ抽出
 │   ├── llm/                    # Gemini API統合（評価、サマリー生成）
 │   └── discord/                # Discord通知
-├── tests/                      # テストファイル（✅ 契約テスト実装済み）
+├── tests/                      # テストファイル
 │   └── contract/               # 契約テスト（Discord, Firestore, Gemini, RSS）
-├── terraform/                  # インフラストラクチャコード（✅ 実装済み）
+├── terraform/                  # インフラストラクチャコード
 │   ├── environments/
 │   │   └── prod/
 │   └── modules/
@@ -59,8 +59,8 @@
 │       └── cloud-function/
 ├── specs/                      # 設計ドキュメント
 │   └── 001-rss-article-curator/
-├── config.json                 # 記事の好み設定（✅ カスタマイズ可能）
-└── cloudbuild.yaml             # Cloud Build設定（✅ 実装済み）
+├── config.json                 # 記事の好み設定（カスタマイズ可能）
+└── cloudbuild.yaml             # Cloud Build設定
 ```
 
 ## 記事の好みをカスタマイズする
