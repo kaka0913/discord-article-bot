@@ -72,7 +72,7 @@ jobs:
             --gen2 \
             --region=${{ env.REGION }} \
             --runtime=go122 \
-            --source=. \
+            --source=cmd/curator \
             --entry-point=CuratorHandler \
             --trigger-http \
             --no-allow-unauthenticated \

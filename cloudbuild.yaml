@@ -26,7 +26,7 @@ steps:
       - '--gen2'
       - '--runtime=go122'
       - '--region=${_REGION}'
-      - '--source=.'
+      - '--source=cmd/curator'
       - '--entry-point=CuratorHandler'
       - '--trigger-http'
       - '--no-allow-unauthenticated'

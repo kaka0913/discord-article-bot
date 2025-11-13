@@ -155,7 +155,7 @@ gcloud functions deploy rss-article-curator \
   --gen2 \
   --region=asia-northeast1 \
   --runtime=go122 \
-  --source=. \
+  --source=cmd/curator \
   --entry-point=CuratorHandler \
   --trigger-http \
   --no-allow-unauthenticated \
@@ -212,7 +212,7 @@ gcloud functions deploy rss-article-curator \
 1. テスト実行
 2. Cloud Functionsデプロイ
    - functions-framework-goによりそのままデプロイ
-   - gcloudコマンドで`--source=.`を指定
+   - gcloudコマンドで`--source=cmd/curator`を指定
 3. デプロイ結果を表示
 
 詳細は[.github/workflows/](../.github/workflows/)を参照。
