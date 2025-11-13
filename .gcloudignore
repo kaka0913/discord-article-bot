@@ -19,8 +19,9 @@ specs/
 # Tests
 *_test.go
 
-# Local development
-cmd/local-test/
+# Local development and alternative entry points
+# Exclude cmd/ to avoid "is a program, not an importable package" error
+cmd/
 
 # Build artifacts
 *.exe
