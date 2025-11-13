@@ -17,18 +17,6 @@
 - **Gemini Flash API** / Discord Webhook
 - **GitHub Actions** (CI/CD)
 
-## プロジェクト構造
-
-```
-.
-├── .github/workflows/      # CI/CDワークフロー
-├── cmd/curator/            # Cloud Functions本番用
-├── internal/               # 内部パッケージ
-├── terraform/              # インフラコード
-├── config.json             # 記事の好み設定
-└── cloudbuild.yaml         # Cloud Build設定
-```
-
 ## 記事の好みをカスタマイズ
 
 ### 設定ファイル（config.json）
