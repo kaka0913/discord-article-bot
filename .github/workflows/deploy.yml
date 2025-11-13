@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - 'cmd/curator/**'
+      - 'function.go'
       - 'internal/**'
       - 'go.mod'
       - 'go.sum'
       - 'config.json'
+      - '.gcloudignore'
       - '.github/workflows/deploy.yml'
 
 env:
