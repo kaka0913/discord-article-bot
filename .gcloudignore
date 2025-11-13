@@ -1,0 +1,36 @@
+# Git files
+.git
+.gitignore
+
+# CI/CD
+.github/
+
+# Terraform
+terraform/
+
+# Specs
+specs/
+
+# Documentation
+*.md
+!go.mod
+!go.sum
+
+# Tests
+*_test.go
+
+# Local development
+cmd/local-test/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
