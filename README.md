@@ -156,6 +156,10 @@ gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
 
 gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
   --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
+  --role="roles/run.admin"
+
+gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
+  --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
   --role="roles/storage.objectAdmin"
 
 # サービスアカウントのJSONキーを作成
