@@ -77,12 +77,6 @@
 - テスト → ビルド → 自動デプロイ
 - Cloud Functionsに反映
 
-### セットアップ
-
-GitHub Secretsに以下を設定：
-- `GCP_SA_KEY`: サービスアカウントJSONキー
-- `GCP_PROJECT_ID`: `rss-article-curator-prod`
-
 ## ローカル開発
 
 ```bash

@@ -77,7 +77,7 @@ echo -n "https://discord.com/api/webhooks/..." | gcloud secrets versions add dis
 
 - **Firestore**: データベースとインデックス
 - **Secret Manager**: Gemini API Key、Discord Webhook URL
-- **Cloud Scheduler**: 毎日8:00 JSTの定期実行ジョブ
+- **Cloud Scheduler**: 毎日9:00 JSTの定期実行ジョブ
 - **Pub/Sub**: Cloud Schedulerからのトリガートピック
 - **Cloud Functions Gen 2**: RSS記事キュレーションの実行環境
 - **Cloud Storage**: ソースコードアーカイブ保存用バケット
