@@ -28,13 +28,18 @@
       "priority": "high"
     },
     {
-      "topic": "サーバーレス",
-      "aliases": ["Serverless", "Cloud Functions", "Lambda"],
+      "topic": "Cloudflare",
+      "aliases": ["Cloudflare Workers", "Cloudflare Pages", "Cloudflare D1", "Workers KV"],
+      "priority": "high"
+    },
+    {
+      "topic": "モバイルアプリ開発",
+      "aliases": ["iOS", "Android", "React Native", "Flutter", "Swift", "Kotlin"],
       "priority": "medium"
     },
     {
-      "topic": "機械学習",
-      "aliases": ["Machine Learning", "ML", "AI"],
+      "topic": "サーバーレス",
+      "aliases": ["Serverless", "Cloud Functions", "Lambda"],
       "priority": "medium"
     },
     {
@@ -44,7 +49,7 @@
     }
   ],
   "notification_settings": {
-    "max_articles": 5,
+    "max_articles": 3,
     "min_articles": 1,
     "min_relevance_score": 70
   },

@@ -1,0 +1,98 @@
+name: Deploy to Google Cloud Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'cmd/curator/**'
+      - 'internal/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'config.json'
+      - '.github/workflows/deploy.yml'
+
+env:
+  FUNCTION_NAME: rss-article-curator
+  REGION: asia-northeast1
+  PROJECT_ID: rss-article-curator-prod
+  SERVICE_ACCOUNT: rss-curator-function@rss-article-curator-prod.iam.gserviceaccount.com
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./... -v
+
+      - name: Validate config.json
+        run: |
+          if ! jq empty config.json 2>/dev/null; then
+            echo "Invalid JSON in config.json"
+            exit 1
+          fi
+          echo "config.json is valid"
+
+  deploy:
+    name: Deploy Cloud Function
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Deploy to Cloud Functions
+        run: |
+          gcloud functions deploy ${{ env.FUNCTION_NAME }} \
+            --gen2 \
+            --region=${{ env.REGION }} \
+            --runtime=go122 \
+            --source=. \
+            --entry-point=CuratorHandler \
+            --trigger-http \
+            --no-allow-unauthenticated \
+            --service-account=${{ env.SERVICE_ACCOUNT }} \
+            --memory=512Mi \
+            --timeout=3600s \
+            --max-instances=1 \
+            --min-instances=0 \
+            --set-env-vars=CONFIG_URL=https://raw.githubusercontent.com/kaka0913/discord-article-bot/main/config.json,GCP_PROJECT_ID=${{ env.PROJECT_ID }},GEMINI_API_KEY_SECRET=gemini-api-key,DISCORD_WEBHOOK_SECRET=discord-webhook-url \
+            --project=${{ env.PROJECT_ID }}
+
+      - name: Verify deployment
+        run: |
+          gcloud functions describe ${{ env.FUNCTION_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format="value(state)"
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "Function URL: https://${{ env.REGION }}-${{ env.PROJECT_ID }}.cloudfunctions.net/${{ env.FUNCTION_NAME }}"
+          echo "Next scheduled run: Daily at 09:00 JST"

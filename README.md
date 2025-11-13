@@ -1,121 +1,188 @@
 # RSS記事キュレーションBot
 
-技術ブログまとめサイトを毎日監視し、Gemini LLMを使用してユーザー定義の興味に対する記事の関連性を評価し、要約付きの3〜5件のキュレーション記事をDiscordに投稿するサーバーレスRSS記事キュレーター。
+技術ブログから毎日記事を収集し、Gemini LLMで関連性を評価してDiscordに通知するサーバーレスBot。
 
-## 概要
+## 主要機能
 
-このプロジェクトは、Google Cloud Functions（Go）で実行され、JST午前8時にCloud Schedulerによってトリガーされ、重複排除追跡にFirestore、認証情報にSecret Managerを使用します。
-
-**現在のステータス**: 実装とローカルテストが完了し、GCPデプロイ待ちです（8/9タスク完了）。
-
-### 主要機能
-
-- 毎日の自動実行（JST午前8時）
-- 複数のRSSフィードからの記事収集
-- Gemini API v2.0による記事の関連性評価とスコアリング
-- AI生成記事の自動検出と除外
-- **記事全体のサマリー生成** - 選択された記事全体の傾向分析
-- Discord Webhookによる通知
-- Firestoreによる重複排除（30日間TTL）
+- 毎日自動実行（JST 9:00）
+- Gemini APIによる記事の関連性評価
+- Discord Webhookで通知
+- Firestoreで重複排除
+- **config.json**で記事の好みをカスタマイズ可能
 
 ## 技術スタック
 
-- **言語**: Go 1.21+
-- **プラットフォーム**: Google Cloud Functions Gen 2
-- **インフラ**: Terraform
-- **ストレージ**: Firestore
-- **LLM**: Google Gemini Flash API
-- **通知**: Discord Webhook
+- **Go 1.21+** / Google Cloud Functions Gen 2
+- **Terraform** / Firestore / Secret Manager
+- **Gemini Flash API** / Discord Webhook
+- **GitHub Actions** (CI/CD)
 
-## プロジェクト構造
+## 記事の好みをカスタマイズ
 
-```
-.
-├── cmd/
-│   ├── curator/          # Cloud Functions本番環境用（✅ 実装済み）
-│   └── local-test/       # ローカルテスト用（✅ 実装済み）
-├── internal/             # 内部パッケージ（✅ すべて実装済み）
-│   ├── config/          # 設定管理
-│   ├── secrets/         # Secret Manager統合
-│   ├── errors/          # エラーハンドリング
-│   ├── logging/         # 構造化ログ
-│   ├── storage/         # Firestore操作
-│   ├── rss/             # RSSフィード処理
-│   ├── article/         # 記事コンテンツ抽出
-│   ├── llm/             # Gemini API統合（評価、サマリー生成）
-│   └── discord/         # Discord通知
-├── tests/               # テストファイル（✅ 契約テスト実装済み）
-│   └── contract/        # 契約テスト（Discord, Firestore, Gemini, RSS）
-├── terraform/           # インフラストラクチャコード（✅ 実装済み）
-│   ├── environments/
-│   │   └── prod/
-│   └── modules/
-│       ├── firestore/
-│       ├── secrets/
-│       ├── scheduler/
-│       └── cloud-function/
-└── specs/               # 設計ドキュメント
-    └── 001-rss-article-curator/
+### 設定ファイル（config.json）
+
+```json
+{
+  "interests": [
+    {
+      "topic": "Go言語",
+      "aliases": ["Golang", "Go"],
+      "priority": "high"
+    }
+  ],
+  "notification_settings": {
+    "max_articles": 5,
+    "min_relevance_score": 70
+  },
+  "rss_sources": [
+    {
+      "name": "Zenn.dev",
+      "url": "https://zenn.dev/feed",
+      "enabled": true
+    }
+  ]
+}
 ```
 
-## セットアップ
+### 変更手順
 
-### 前提条件
+1. ブランチ作成: `git checkout -b config/update-interests`
+2. config.jsonを編集
+3. コミット: `git commit -m "config: トピック更新"`
+4. プッシュしてPR作成
+5. 自動テストが実行される
+6. マージすると自動デプロイ
+7. **翌朝9:00から新設定で通知開始**
 
-- Go 1.21以上
-- Google Cloud SDK
-- Terraform
-- Google Cloud Projectとその権限
+## CI/CD
 
-### ローカル開発
+### プルリクエスト
+- ユニットテスト自動実行
+- config.json構文検証
+- テスト結果をPRにコメント
 
-1. リポジトリをクローン
+### mainマージ時
+- テスト → ビルド → 自動デプロイ
+- Cloud Functionsに反映
+
+## 自分用にデプロイする
+
+このリポジトリをフォークして、自分のGCPプロジェクトにデプロイできます。
+
+### 1. フォークとクローン
+
+```bash
+# GitHubでリポジトリをフォーク後
+git clone https://github.com/YOUR_USERNAME/discord-article-bot.git
+cd discord-article-bot
+```
+
+### 2. GCPプロジェクトの作成
+
+```bash
+# プロジェクト作成（プロジェクトIDは自分で決める）
+gcloud projects create YOUR-PROJECT-ID
+gcloud config set project YOUR-PROJECT-ID
+
+# 必要なAPIを有効化
+gcloud services enable \
+  cloudfunctions.googleapis.com \
+  firestore.googleapis.com \
+  secretmanager.googleapis.com \
+  cloudscheduler.googleapis.com \
+  cloudbuild.googleapis.com
+```
+
+### 3. Terraformでインフラ構築
+
+```bash
+cd terraform/environments/prod
+
+# 変数ファイルを作成
+cp terraform.tfvars.example terraform.tfvars
+
+# terraform.tfvarsを編集してプロジェクトIDを設定
+# 例: project_id = "YOUR-PROJECT-ID"
+
+# デプロイ
+terraform init
+terraform apply
+```
+
+### 4. シークレットの設定
+
+```bash
+# Gemini API Key（https://aistudio.google.com/app/apikey で取得）
+echo -n "YOUR_GEMINI_API_KEY" | \
+  gcloud secrets versions add gemini-api-key \
+  --project=YOUR-PROJECT-ID \
+  --data-file=-
+
+# Discord Webhook URL（Discordサーバー設定から取得）
+echo -n "https://discord.com/api/webhooks/YOUR_WEBHOOK" | \
+  gcloud secrets versions add discord-webhook-url \
+  --project=YOUR-PROJECT-ID \
+  --data-file=-
+```
+
+### 5. GitHub Secretsの設定
+
+```bash
+# サービスアカウントのJSONキーを作成
+gcloud iam service-accounts keys create ~/gcp-sa-key.json \
+  --iam-account=rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com \
+  --project=YOUR-PROJECT-ID
+
+# GitHub CLIでシークレット設定（またはGitHub UIから手動設定）
+gh secret set GCP_SA_KEY --body "$(cat ~/gcp-sa-key.json)"
+
+# セキュリティのため削除
+rm ~/gcp-sa-key.json
+```
+
+### 6. config.jsonをカスタマイズ
+
+自分の興味のあるトピックやRSSソースに変更：
+
+```bash
+# config.jsonを編集
+vim config.json
+
+# コミット＆プッシュ
+git add config.json
+git commit -m "config: 自分の好みに変更"
+git push origin main
+```
+
+### 7. デプロイ確認
+
+- GitHub Actions: `https://github.com/YOUR_USERNAME/discord-article-bot/actions`
+- GCP Console: Cloud Functions、Cloud Schedulerを確認
+- 翌朝9:00 JSTに自動実行
+
+### 費用について
+
+無料枠で運用可能（月間約$0-5）：
+- Cloud Functions: 毎日1回実行で無料枠内
+- Firestore: 数千記事まで無料
+- Cloud Scheduler: 3ジョブまで無料
+- Gemini API: 月15RPMまで無料
+
+## ローカル開発
+
 ```bash
 git clone <repository-url>
-cd rss-article-curator
-```
-
-2. 環境変数を設定
-```bash
-cp .env.example .env
-# .envファイルを編集して必要な値を設定
-```
-
-3. 依存関係をインストール
-```bash
+cd discord-article-bot
 go mod download
-```
-
-4. config.jsonを編集してRSSソースと興味を設定
-
-### デプロイ
-
-詳細は `specs/001-rss-article-curator/quickstart.md` を参照してください。
-
-## テスト
-
-```bash
-# すべてのテストを実行
+# config.jsonを編集
 go test ./...
-
-# 契約テストのみ（実装済み）
-go test ./tests/contract/...
-
-# 各パッケージのユニットテスト
-go test ./internal/config/...
-go test ./internal/errors/...
-go test ./internal/logging/...
-go test ./internal/secrets/...
 ```
 
 ## ドキュメント
 
-- [AGENT.md](AGENT.md) - エージェント指示書、プロジェクト概要
 - [仕様書](specs/001-rss-article-curator/spec.md)
 - [実装計画](specs/001-rss-article-curator/plan.md)
-- [タスクリスト](specs/001-rss-article-curator/tasks.md)
 - [クイックスタート](specs/001-rss-article-curator/quickstart.md)
-- [データモデル](specs/001-rss-article-curator/data-model.md)
 
 ## ライセンス
 
