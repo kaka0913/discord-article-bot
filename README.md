@@ -84,13 +84,18 @@ cd discord-article-bot
 gcloud projects create YOUR-PROJECT-ID
 gcloud config set project YOUR-PROJECT-ID
 
-# 必要なAPIを有効化
+# 必要なAPIを有効化（すべて必須）
 gcloud services enable \
+  cloudresourcemanager.googleapis.com \
   cloudfunctions.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  run.googleapis.com \
+  eventarc.googleapis.com \
+  pubsub.googleapis.com \
   firestore.googleapis.com \
   secretmanager.googleapis.com \
-  cloudscheduler.googleapis.com \
-  cloudbuild.googleapis.com
+  cloudscheduler.googleapis.com
 ```
 
 ### 3. Terraformでインフラ構築
@@ -128,6 +133,31 @@ echo -n "https://discord.com/api/webhooks/YOUR_WEBHOOK" | \
 ### 5. GitHub Secretsの設定
 
 ```bash
+# デプロイに必要な権限をサービスアカウントに追加
+gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
+  --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
+  --role="roles/cloudfunctions.developer"
+
+gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
+  --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
+
+gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
+  --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
+  --role="roles/cloudbuild.builds.editor"
+
+gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
+  --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
+  --role="roles/artifactregistry.writer"
+
+gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
+  --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
+  --role="roles/run.developer"
+
+gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
+  --member="serviceAccount:rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
+  --role="roles/storage.objectAdmin"
+
 # サービスアカウントのJSONキーを作成
 gcloud iam service-accounts keys create ~/gcp-sa-key.json \
   --iam-account=rss-curator-function@YOUR-PROJECT-ID.iam.gserviceaccount.com \
