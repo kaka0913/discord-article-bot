@@ -66,6 +66,12 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Prepare deployment files
+        run: |
+          cp go.mod cmd/curator/
+          cp go.sum cmd/curator/
+          cp -r internal cmd/curator/
+
       - name: Deploy to Cloud Functions
         run: |
           gcloud functions deploy ${{ env.FUNCTION_NAME }} \
