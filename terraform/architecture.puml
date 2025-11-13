@@ -1,0 +1,73 @@
+@startuml
+skinparam rectangle {
+    BackgroundColor<<scheduler>> LightSkyBlue
+    BackgroundColor<<function>> LightGreen
+    BackgroundColor<<storage>> LightYellow
+    BackgroundColor<<external>> LightCoral
+}
+
+skinparam package {
+    BackgroundColor LightGray
+}
+
+' 外部サービス
+rectangle "外部サービス" as external <<external>> {
+    cloud "RSS Feeds" as rss
+    cloud "Discord" as discord
+    cloud "Gemini API" as gemini
+}
+
+' GCPリソース
+package "Google Cloud Platform" {
+    rectangle "Cloud Scheduler" as scheduler <<scheduler>> {
+        card "毎日 9:00 JST\nHTTPトリガー" as cron
+    }
+
+    rectangle "Cloud Functions Gen2" as function <<function>> {
+        card "rss-article-curator\n(Go 1.22)\n60分タイムアウト" as cf
+    }
+
+    rectangle "データストア" as storage <<storage>> {
+        database "Firestore" as firestore {
+            collections "notified_articles\nrejected_articles" as collections
+        }
+
+        folder "Secret Manager" as secrets {
+            artifact "gemini-api-key" as gemini_key
+            artifact "discord-webhook-url" as webhook_url
+        }
+    }
+
+    actor "Service Account" as sa
+}
+
+' フロー
+cron -down-> cf : "HTTPS POST\n(OIDC認証)"
+cf -right-> rss : "1. RSSフィード取得"
+cf -down-> firestore : "2. 重複チェック\n3. 結果保存"
+cf -up-> gemini : "4. 記事評価\n(API Key)"
+cf -right-> discord : "5. 通知送信\n(Webhook)"
+
+cf -left-> secrets : "シークレット取得"
+cf ..> sa : "実行アカウント"
+
+note right of sa
+    rss-curator-function@
+    rss-article-curator-prod
+    .iam.gserviceaccount.com
+
+    権限:
+    - Secret Manager Reader
+    - Datastore User
+    - Cloud Functions Invoker
+end note
+
+note right of cf
+    環境変数:
+    - CONFIG_URL (GitHub Raw)
+    - GCP_PROJECT_ID
+    - GEMINI_API_KEY_SECRET
+    - DISCORD_WEBHOOK_SECRET
+end note
+
+@enduml
