@@ -31,9 +31,7 @@ jobs:
 
       - name: Run unit tests
         id: unit_tests
-        run: |
-          go test ./... -v -coverprofile=coverage.out
-          echo "COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')" >> $GITHUB_OUTPUT
+        run: go test ./... -v
 
       - name: Validate config.json syntax
         id: config_validation
@@ -118,7 +116,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const coverage = '${{ steps.unit_tests.outputs.COVERAGE }}' || 'N/A';
+            const testsPassed = '${{ steps.unit_tests.outcome }}' === 'success';
             const configValid = '${{ steps.config_validation.outputs.VALID }}' === 'true';
             const rssCount = '${{ steps.schema_validation.outputs.RSS_COUNT }}' || '0';
             const interestCount = '${{ steps.schema_validation.outputs.INTEREST_COUNT }}' || '0';
@@ -133,8 +131,7 @@ jobs:
             const body = `## テスト結果 🧪
 
             ### ユニットテスト
-            ${coverage !== 'N/A' ? '✅ すべてのテストが合格しました' : '❌ テストが失敗しました'}
-            - カバレッジ: ${coverage}
+            ${testsPassed ? '✅ すべてのテストが合格しました' : '❌ テストが失敗しました'}
 
             ### config.json検証
             ${configValid ? '✅ 設定ファイルは有効です' : '❌ 設定ファイルが無効です'}
@@ -154,17 +151,3 @@ jobs:
               repo: context.repo.repo,
               body: body
             });
-
-      - name: Generate coverage HTML report
-        if: success()
-        run: go tool cover -html=coverage.out -o coverage.html
-
-      - name: Upload coverage reports
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: |
-            coverage.out
-            coverage.html
-          retention-days: 30
