@@ -1,16 +1,14 @@
-// Package main はRSS記事キュレーションBotのCloud Functionsエントリーポイントです
-package main
+// Package function はRSS記事キュレーションBotのCloud Functionsエントリーポイントです
+package function
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"sort"
 	"time"
 
-	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 
 	"github.com/kaka0913/discord-article-bot/internal/article"
@@ -26,18 +24,6 @@ import (
 func init() {
 	// Cloud Functions HTTPハンドラーを登録
 	functions.HTTP("CuratorHandler", curatorHandler)
-}
-
-func main() {
-	// Cloud Functionsフレームワークを起動
-	// PORT環境変数が設定されている場合、HTTPサーバーとして起動
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	if err := funcframework.Start(port); err != nil {
-		log.Fatalf("funcframework.Start: %v\n", err)
-	}
 }
 
 // handleError はエラーをログに記録し、HTTPエラーレスポンスを返す
