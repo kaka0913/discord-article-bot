@@ -1,4 +1,5 @@
-// Package function はRSS記事キュレーションBotのCloud Functionsエントリーポイントです
+// Package function はRSS記事キュレーションBotのCloud Functionsエントリーポイントです。
+// Cloud Functions Gen2ではpackage mainではなく任意のパッケージ名を使用する必要があります。
 package function
 
 import (
