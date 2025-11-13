@@ -4,81 +4,9 @@
 
 ## インフラ構成図
 
-```plantuml
-@startuml
-skinparam rectangle {
-    BackgroundColor<<scheduler>> LightSkyBlue
-    BackgroundColor<<function>> LightGreen
-    BackgroundColor<<storage>> LightYellow
-    BackgroundColor<<external>> LightCoral
-}
+![インフラ構成](archi.png)
 
-skinparam package {
-    BackgroundColor LightGray
-}
-
-' 外部サービス
-rectangle "外部サービス" as external <<external>> {
-    cloud "RSS Feeds" as rss
-    cloud "Discord" as discord
-    cloud "Gemini API" as gemini
-}
-
-' GCPリソース
-package "Google Cloud Platform" {
-    rectangle "Cloud Scheduler" as scheduler <<scheduler>> {
-        card "毎日 9:00 JST\nHTTPトリガー" as cron
-    }
-
-    rectangle "Cloud Functions Gen2" as function <<function>> {
-        card "rss-article-curator\n(Go 1.22)\n60分タイムアウト" as cf
-    }
-
-    rectangle "データストア" as storage <<storage>> {
-        database "Firestore" as firestore {
-            collections "notified_articles\nrejected_articles" as collections
-        }
-
-        folder "Secret Manager" as secrets {
-            artifact "gemini-api-key" as gemini_key
-            artifact "discord-webhook-url" as webhook_url
-        }
-    }
-
-    actor "Service Account" as sa
-}
-
-' フロー
-cron -down-> cf : "HTTPS POST\n(OIDC認証)"
-cf -right-> rss : "1. RSSフィード取得"
-cf -down-> firestore : "2. 重複チェック\n3. 結果保存"
-cf -up-> gemini : "4. 記事評価\n(API Key)"
-cf -right-> discord : "5. 通知送信\n(Webhook)"
-
-cf -left-> secrets : "シークレット取得"
-cf ..> sa : "実行アカウント"
-
-note right of sa
-    rss-curator-function@
-    rss-article-curator-prod
-    .iam.gserviceaccount.com
-
-    権限:
-    - Secret Manager Reader
-    - Datastore User
-    - Cloud Functions Invoker
-end note
-
-note right of cf
-    環境変数:
-    - CONFIG_URL (GitHub Raw)
-    - GCP_PROJECT_ID
-    - GEMINI_API_KEY_SECRET
-    - DISCORD_WEBHOOK_SECRET
-end note
-
-@enduml
-```
+インフラ構成の詳細は [ARCHITECTURE.md](ARCHITECTURE.md) を参照してください。
 
 ## 現在のデプロイ状況
 
@@ -86,19 +14,19 @@ end note
 
 以下のリソースはTerraformで管理されています：
 
-- ✅ **Firestore Database** - ネイティブモードデータベース
-- ✅ **Firestore Index** - TTLインデックス（notified_articles, rejected_articles）
-- ✅ **Secret Manager** - シークレットリソース（gemini-api-key, discord-webhook-url）
-- ✅ **Service Account** - Cloud Functions実行用サービスアカウント
-- ✅ **IAM Bindings** - Secret Manager、Datastore、Functions Invokerの権限
-- ✅ **Cloud Scheduler** - 毎日9:00 JSTのHTTPトリガージョブ
+- **Firestore Database** - ネイティブモードデータベース
+- **Firestore Index** - TTLインデックス（notified_articles, rejected_articles）
+- **Secret Manager** - シークレットリソース（gemini-api-key, discord-webhook-url）
+- **Service Account** - Cloud Functions実行用サービスアカウント
+- **IAM Bindings** - Secret Manager、Datastore、Functions Invokerの権限
+- **Cloud Scheduler** - 毎日9:00 JSTのHTTPトリガージョブ
 
 ### 手動デプロイ対象（Terraform管理外）
 
 以下のリソースは**GitHub Actionsで自動デプロイ**されます：
 
 - **Cloud Functions Gen2** - `gcloud functions deploy`コマンドでデプロイ
-  - 理由: Goのパッケージ構造変換（package main → package function）が必要なため
+  - 理由: functions-framework-goを使用したHTTPサーバー実装のため
   - デプロイ: `.github/workflows/deploy.yml`で自動実行
 
 ## ディレクトリ構造
@@ -207,34 +135,27 @@ Cloud FunctionsはGitHub Actionsで自動デプロイされます：
 
 ## 手動デプロイ（Cloud Functions）
 
-必要に応じて手動でCloud Functionsをデプロイすることもできます：
+### functions-framework-goによる実装
+
+このプロジェクトは[functions-framework-go](https://github.com/GoogleCloudPlatform/functions-framework-go)を使用しているため、リポジトリルートから直接デプロイ可能です。
+
+**主な特徴**：
+- `package main`のまま動作（コード変換不要）
+- `main()`関数でHTTPサーバー起動（ローカルテストとCloud Functions両対応）
+- `init()`で関数登録（エントリーポイント定義）
+
+### デプロイコマンド
 
 ```bash
 # リポジトリルートで実行
 cd /path/to/discord-article-bot
 
-# デプロイディレクトリの準備
-mkdir -p /tmp/function-deploy
-cp cmd/curator/main.go /tmp/function-deploy/
-cp -r internal /tmp/function-deploy/
-cp go.mod /tmp/function-deploy/
-cp go.sum /tmp/function-deploy/
-
-# パッケージ名とimportパスの変更
-cd /tmp/function-deploy
-sed -i.bak 's/package main/package function/g' main.go && rm main.go.bak
-sed -i.bak '/^func main()/,/^}$/d' main.go && rm main.go.bak
-sed -i.bak 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' main.go && rm main.go.bak
-sed -i.bak 's|module github.com/kaka0913/discord-article-bot|module example.com/rss-curator-function|' go.mod && rm go.mod.bak
-find internal -name "*.go" -type f -exec sed -i.bak 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' {} \;
-find internal -name "*.bak" -type f -delete
-
-# デプロイ
+# そのままデプロイ（コード変換不要）
 gcloud functions deploy rss-article-curator \
   --gen2 \
   --region=asia-northeast1 \
   --runtime=go122 \
-  --source=/tmp/function-deploy \
+  --source=. \
   --entry-point=CuratorHandler \
   --trigger-http \
   --no-allow-unauthenticated \
@@ -246,6 +167,11 @@ gcloud functions deploy rss-article-curator \
   --set-env-vars=CONFIG_URL=https://raw.githubusercontent.com/kaka0913/discord-article-bot/main/config.json,GCP_PROJECT_ID=rss-article-curator-prod,GEMINI_API_KEY_SECRET=gemini-api-key,DISCORD_WEBHOOK_SECRET=discord-webhook-url \
   --project=rss-article-curator-prod
 ```
+
+**メリット**：
+- デプロイプロセスが単純（sed変換不要）
+- ローカルテストとCloud Functions実行の一貫性
+- メンテナンス性向上
 
 ## 管理対象リソース
 
@@ -285,9 +211,8 @@ gcloud functions deploy rss-article-curator \
 
 1. テスト実行
 2. Cloud Functionsデプロイ
-   - ソースコード変換（package main → package function）
-   - importパス変更
-   - gcloudコマンドでデプロイ
+   - functions-framework-goによりそのままデプロイ
+   - gcloudコマンドで`--source=.`を指定
 3. デプロイ結果を表示
 
 詳細は[.github/workflows/](../.github/workflows/)を参照。
