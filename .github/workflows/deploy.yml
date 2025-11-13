@@ -66,37 +66,13 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      - name: Prepare deployment directory
-        run: |
-          mkdir -p /tmp/function-deploy
-          cp cmd/curator/main.go /tmp/function-deploy/
-          cp -r internal /tmp/function-deploy/
-          cp go.mod /tmp/function-deploy/
-          cp go.sum /tmp/function-deploy/
-
-          # package mainをfunctionに変更（GNU sed使用）
-          sed -i.bak 's/package main/package function/g' /tmp/function-deploy/main.go && rm /tmp/function-deploy/main.go.bak
-
-          # main()関数を削除
-          sed -i.bak '/^func main()/,/^}$/d' /tmp/function-deploy/main.go && rm /tmp/function-deploy/main.go.bak
-
-          # importパスを修正
-          sed -i.bak 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' /tmp/function-deploy/main.go && rm /tmp/function-deploy/main.go.bak
-
-          # go.modのmodule名を修正
-          sed -i.bak 's|module github.com/kaka0913/discord-article-bot|module example.com/rss-curator-function|' /tmp/function-deploy/go.mod && rm /tmp/function-deploy/go.mod.bak
-
-          # internal配下のimportパスも修正
-          find /tmp/function-deploy/internal -name "*.go" -type f -exec sed -i.bak 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' {} \;
-          find /tmp/function-deploy/internal -name "*.bak" -type f -delete
-
       - name: Deploy to Cloud Functions
         run: |
           gcloud functions deploy ${{ env.FUNCTION_NAME }} \
             --gen2 \
             --region=${{ env.REGION }} \
             --runtime=go122 \
-            --source=/tmp/function-deploy \
+            --source=. \
             --entry-point=CuratorHandler \
             --trigger-http \
             --no-allow-unauthenticated \

@@ -17,36 +17,7 @@ steps:
     id: 'run-tests'
     waitFor: ['download-deps']
 
-  # ステップ3: デプロイ用ディレクトリの準備
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        mkdir -p /workspace/deploy
-        cp cmd/curator/main.go /workspace/deploy/
-        cp -r internal /workspace/deploy/
-        cp go.mod /workspace/deploy/
-        cp go.sum /workspace/deploy/
-
-        # package mainをfunctionに変更
-        sed -i 's/package main/package function/g' /workspace/deploy/main.go
-
-        # main()関数を削除
-        sed -i '/^func main()/,/^}$$/d' /workspace/deploy/main.go
-
-        # importパスを修正
-        sed -i 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' /workspace/deploy/main.go
-
-        # go.modのmodule名を修正
-        sed -i 's|module github.com/kaka0913/discord-article-bot|module example.com/rss-curator-function|' /workspace/deploy/go.mod
-
-        # internal配下のimportパスも修正
-        find /workspace/deploy/internal -name "*.go" -type f -exec sed -i 's|github.com/kaka0913/discord-article-bot/internal|example.com/rss-curator-function/internal|g' {} \;
-    id: 'prepare-deploy'
-    waitFor: ['run-tests']
-
-  # ステップ4: Cloud Functionsデプロイ（HTTPトリガー）
+  # ステップ3: Cloud Functionsデプロイ（HTTPトリガー）
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'functions'
@@ -55,7 +26,7 @@ steps:
       - '--gen2'
       - '--runtime=go122'
       - '--region=${_REGION}'
-      - '--source=/workspace/deploy'
+      - '--source=.'
       - '--entry-point=CuratorHandler'
       - '--trigger-http'
       - '--no-allow-unauthenticated'
@@ -67,7 +38,7 @@ steps:
       - '--set-env-vars=CONFIG_URL=https://raw.githubusercontent.com/${_GITHUB_REPO}/main/config.json,GCP_PROJECT_ID=${PROJECT_ID},GEMINI_API_KEY_SECRET=gemini-api-key,DISCORD_WEBHOOK_SECRET=discord-webhook-url'
       - '--project=${PROJECT_ID}'
     id: 'deploy-function'
-    waitFor: ['prepare-deploy']
+    waitFor: ['run-tests']
 
 # デフォルト値
 substitutions:
